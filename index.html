@@ -13,18 +13,14 @@
         body { background-color: var(--bg); color: var(--text); padding: 20px; padding-bottom: 80px; }
         h1 { font-size: 24px; margin-bottom: 20px; color: var(--accent); text-align: center; }
         
-        /* Экраны */
         .screen { display: none; }
         .screen.active { display: block; }
 
-        /* Экран входа */
         .auth-container { max-width: 400px; margin: 50px auto; text-align: center; }
         .auth-container input { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #333; background: var(--card); color: var(--text); font-size: 16px; }
         .auth-container button { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--accent); color: #000; font-weight: bold; font-size: 16px; cursor: pointer; margin-bottom: 10px; }
         .auth-container button:active { opacity: 0.7; }
-        .auth-link { color: var(--accent); cursor: pointer; text-decoration: underline; font-size: 14px; }
 
-        /* Офлайн */
         .offline-banner { background: #cf6679; color: #000; text-align: center; padding: 8px; font-size: 14px; font-weight: bold; border-radius: 8px; margin-bottom: 15px; display: none; }
         .offline-banner.active { display: block; }
 
@@ -47,7 +43,6 @@
         .task-item.p-low { border-left-color: var(--priority-low); }
         .task-item.done { opacity: 0.5; background-color: #181818; border-left-color: #444; }
         .task-item.done .task-title { text-decoration: line-through; color: #888; }
-        .task-item.done .priority-badge { filter: grayscale(1); opacity: 0.5; }
         
         .task-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
         .task-title-wrapper { flex: 1; }
@@ -57,21 +52,20 @@
         .p-high .priority-badge { background: rgba(255, 82, 82, 0.2); color: var(--priority-high); }
         .p-med .priority-badge { background: rgba(255, 215, 64, 0.2); color: var(--priority-med); }
         .p-low .priority-badge { background: rgba(105, 240, 174, 0.2); color: var(--priority-low); }
+        
+        .repeat-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #333; color: #ccc; }
+        
         .task-date { font-size: 11px; color: #888; display: block; margin-top: 6px; }
         .task-actions { display: flex; gap: 5px; align-items: center; }
         .check-btn { background: none; border: 2px solid #444; border-radius: 50%; width: 28px; height: 28px; display: flex; justify-content: center; align-items: center; cursor: pointer; font-size: 16px; color: transparent; transition: all 0.2s; }
-        .check-btn:active { transform: scale(0.9); }
         .check-btn.done { background-color: var(--success); border-color: var(--success); color: #000; }
         .delete-btn { background: none; border: none; font-size: 20px; cursor: pointer; padding: 5px; border-radius: 5px; }
-        .delete-btn:active { background-color: #333; }
         
         .progress-controls { display: flex; align-items: center; gap: 10px; background: #252525; padding: 8px 12px; border-radius: 8px; }
         input[type="range"] { flex: 1; -webkit-appearance: none; background: transparent; height: 6px; }
         input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #333; border-radius: 3px; }
         input[type="range"]::-webkit-slider-thumb { height: 16px; width: 16px; border-radius: 50%; background: var(--accent); cursor: pointer; -webkit-appearance: none; margin-top: -5px; }
-        .task-item.done input[type="range"]::-webkit-slider-thumb { background: #555; }
         input[type="number"] { width: 50px; padding: 4px; border-radius: 4px; border: 1px solid #444; background: var(--bg); color: var(--text); text-align: center; font-size: 14px; }
-        input[type="number"]:focus { outline: none; border-color: var(--accent); }
         .percent-sign { font-size: 14px; color: #888; }
 
         .subtasks-container { border-top: 1px dashed #333; padding-top: 10px; margin-top: 5px; }
@@ -87,37 +81,36 @@
         .add-subtask-row button { padding: 4px 10px; border-radius: 4px; border: none; background: var(--accent); color: #000; cursor: pointer; font-size: 12px; }
         
         .empty-msg { text-align: center; color: #666; margin-top: 40px; font-style: italic; }
-        .sync-status { text-align: center; font-size: 12px; color: #666; margin-top: 10px; }
-        
         .logout-btn { position: absolute; top: 20px; right: 20px; background: none; border: none; color: #cf6679; cursor: pointer; font-size: 14px; }
     </style>
 </head><body>
-    <!-- ЭКРАН ВХОДА -->
     <div id="authScreen" class="screen active">
         <div class="auth-container">
             <h1>📱 Мои Задачи</h1>
-            <p style="margin-bottom: 20px; color: #888;">Войдите, чтобы синхронизировать задачи</p>
-            <input type="email" id="authEmail" placeholder="Email" autocomplete="email">
-            <input type="password" id="authPassword" placeholder="Пароль" autocomplete="current-password">
+            <input type="email" id="authEmail" placeholder="Email">
+            <input type="password" id="authPassword" placeholder="Пароль">
             <button id="loginBtn">Войти</button>
             <button id="registerBtn" style="background: transparent; border: 1px solid #444; color: #fff;">Зарегистрироваться</button>
-            <p id="authError" style="color: #cf6679; margin-top: 10px; font-size: 14px;"></p>
+            <p id="authError" style="color: #cf6679; margin-top: 10px;"></p>
         </div>
     </div>
 
-    <!-- ГЛАВНЫЙ ЭКРАН -->
     <div id="mainScreen" class="screen">
         <button class="logout-btn" id="logoutBtn">Выйти</button>
-        <div id="offlineBanner" class="offline-banner">⚡ Офлайн-режим (изменения сохранятся локально)</div>
-
+        <div id="offlineBanner" class="offline-banner">⚡ Офлайн-режим</div>
         <h1>📱 Мои Задачи</h1>
         
         <div class="input-group">
-            <input type="text" id="taskInput" placeholder="Что нужно сделать?" autocomplete="off">
+            <input type="text" id="taskInput" placeholder="Что нужно сделать?">
             <select id="priorityInput">
                 <option value="low">Низкий</option>
                 <option value="med" selected>Средний</option>
                 <option value="high">Высокий</option>
+            </select>
+            <select id="repeatInput">
+                <option value="none" selected>Не повторять</option>
+                <option value="daily">Каждый день</option>
+                <option value="weekly">Каждую неделю</option>
             </select>
             <button class="add-btn" id="addBtn">+ Добавить</button>
         </div>
@@ -126,31 +119,25 @@
             <button class="filter-btn active" onclick="setFilter('all')">Все</button>
             <button class="filter-btn" onclick="setFilter('active')">Активные</button>
             <button class="filter-btn" onclick="setFilter('done')">📦 Архив</button>
-            <button class="filter-btn" onclick="toggleSort()" id="sortBtn" style="margin-left: auto;">Сначала новые ↓</button>
         </div>
 
         <div class="task-list" id="taskList"></div>
-        <div class="sync-status" id="syncStatus"></div>
     </div>    <script>
         const API_BASE = 'https://task-sync-server.onrender.com';
         let tasks = [];
         let currentFilter = 'all'; 
-        let currentSort = 'new';   
         let authToken = localStorage.getItem('auth_token');
 
-        // Элементы DOM
         const authScreen = document.getElementById('authScreen');
         const mainScreen = document.getElementById('mainScreen');
         const taskInput = document.getElementById('taskInput');
         const priorityInput = document.getElementById('priorityInput');
+        const repeatInput = document.getElementById('repeatInput');
         const addBtn = document.getElementById('addBtn');
         const taskList = document.getElementById('taskList');
-        const sortBtn = document.getElementById('sortBtn');
         const offlineBanner = document.getElementById('offlineBanner');
-        const syncStatus = document.getElementById('syncStatus');
         const authError = document.getElementById('authError');
 
-        // --- АВТОРИЗАЦИЯ ---
         function checkAuth() {
             if (authToken) {
                 authScreen.classList.remove('active');
@@ -165,12 +152,9 @@
         document.getElementById('loginBtn').addEventListener('click', async () => {
             const email = document.getElementById('authEmail').value;
             const password = document.getElementById('authPassword').value;
-            authError.innerText = '';
-            
             const formData = new URLSearchParams();
             formData.append('username', email);
             formData.append('password', password);
-
             try {
                 const res = await fetch(`${API_BASE}/api/login`, { method: 'POST', body: formData });
                 if (res.ok) {
@@ -178,79 +162,42 @@
                     authToken = data.access_token;
                     localStorage.setItem('auth_token', authToken);
                     checkAuth();
-                } else {
-                    authError.innerText = 'Неверный email или пароль';
-                }
-            } catch (e) { authError.innerText = 'Ошибка сети. Сервер спит?'; }
+                } else { authError.innerText = 'Неверный email или пароль'; }
+            } catch (e) { authError.innerText = 'Сервер спит. Подождите.'; }
         });
 
         document.getElementById('registerBtn').addEventListener('click', async () => {
             const email = document.getElementById('authEmail').value;
             const password = document.getElementById('authPassword').value;
-            authError.innerText = '';
-            
             try {
                 const res = await fetch(`${API_BASE}/api/register`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password })
                 });
-                if (res.ok) {
-                    alert('Регистрация успешна! Теперь войдите.');
-                } else {
-                    const data = await res.json();
-                    authError.innerText = data.detail || 'Ошибка регистрации';
-                }
-            } catch (e) { authError.innerText = 'Ошибка сети. Сервер спит?'; }
+                if (res.ok) alert('Успешно! Теперь войдите.');
+                else { const d = await res.json(); authError.innerText = d.detail; }
+            } catch (e) { authError.innerText = 'Сервер спит.'; }
         });
 
         document.getElementById('logoutBtn').addEventListener('click', () => {
-            authToken = null;
-            localStorage.removeItem('auth_token');
-            checkAuth();
+            authToken = null; localStorage.removeItem('auth_token'); checkAuth();
         });
 
-        // --- ОФЛАЙН И СЕТЬ ---
-        function updateOnlineStatus() {
-            if (navigator.onLine) {
-                offlineBanner.classList.remove('active');
-                syncStatus.innerText = 'Синхронизация...';
-                if (authToken) loadTasks();
-            } else {
-                offlineBanner.classList.add('active');
-                syncStatus.innerText = 'Офлайн. Данные сохранены на устройстве.';
-            }
-        }
-        window.addEventListener('online', updateOnlineStatus);
-        window.addEventListener('offline', updateOnlineStatus);
-
-        // --- РАБОТА С ДАННЫМИ ---
         function saveLocal() { localStorage.setItem('my_tasks_offline', JSON.stringify(tasks)); }
         function loadLocal() { const local = localStorage.getItem('my_tasks_offline'); return local ? JSON.parse(local) : []; }
 
         async function loadTasks() {
-            tasks = loadLocal();
-            renderTasks();
-
+            tasks = loadLocal(); renderTasks();
             if (!authToken || !navigator.onLine) return;
-
             try {
-                const response = await fetch(`${API_BASE}/api/tasks`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
+                const response = await fetch(`${API_BASE}/api/tasks`, { headers: { 'Authorization': `Bearer ${authToken}` } });
                 if (response.ok) {
                     tasks = await response.json();
-                    saveLocal();
-                    renderTasks();
-                    syncStatus.innerText = 'Данные синхронизированы.';
+                    saveLocal(); renderTasks();
                 } else if (response.status === 401) {
-                    localStorage.removeItem('auth_token');
-                    location.reload();
+                    localStorage.removeItem('auth_token'); location.reload();
                 }
-            } catch (e) {
-                console.error("Нет связи", e);
-                syncStatus.innerText = 'Офлайн-режим (не удалось обновить).';
-            }
+            } catch (e) { console.log("Офлайн"); }
         }
 
         function setFilter(filter) {
@@ -260,26 +207,6 @@
             renderTasks();
         }
 
-        function toggleSort() {
-            currentSort = currentSort === 'new' ? 'priority' : 'new';
-            sortBtn.innerText = currentSort === 'new' ? 'Сначала новые ↓' : 'По важности ↓';
-            renderTasks();
-        }
-
-        function formatDate(isoString) {
-            if (!isoString) return '';
-            const date = new Date(isoString);
-            const now = new Date();
-            const isToday = date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-            const time = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-            return isToday ? `Сегодня, ${time}` : `${date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}, ${time}`;
-        }
-
-        function getPriorityClass(p) { return p === 'high' ? 'p-high' : p === 'low' ? 'p-low' : 'p-med'; }
-        function getPriorityName(p) { return p === 'high' ? 'Высокий' : p === 'low' ? 'Низкий' : 'Средний'; }
-        function getPriorityWeight(p) { return p === 'high' ? 3 : p === 'med' ? 2 : 1; }
-        function parseSubtasks(str) { try { return str ? JSON.parse(str) : []; } catch(e) { return []; } }
-
         function renderTasks() {
             taskList.innerHTML = '';
             let filteredTasks = tasks.filter(task => {
@@ -288,110 +215,56 @@
                 return true;
             });
 
-            if (currentSort === 'new') filteredTasks.sort((a, b) => (b.id || 0) - (a.id || 0));
-            else if (currentSort === 'priority') filteredTasks.sort((a, b) => getPriorityWeight(b.priority) - getPriorityWeight(a.priority));
-
             if (filteredTasks.length === 0) {
-                taskList.innerHTML = `<div class="empty-msg">${currentFilter === 'done' ? 'Архив пуст' : 'Здесь пока пусто'}</div>`;
+                taskList.innerHTML = `<div class="empty-msg">Пусто</div>`;
                 return;
             }
 
             filteredTasks.forEach((task) => {
-                const index = tasks.findIndex(t => t.id === task.id || t.tempId === task.tempId); 
+                const index = tasks.findIndex(t => t.id === task.id); 
                 const div = document.createElement('div');
-                const pClass = getPriorityClass(task.priority || 'med');
                 const isDone = task.progress === 100 ? 'done' : '';
-                div.className = `task-item ${pClass} ${isDone}`;
+                div.className = `task-item p-${task.priority} ${isDone}`;
                 
-                const dateStr = formatDate(task.created_at);
-                const dateHtml = dateStr ? `<span class="task-date">${dateStr}</span>` : '';
-                
-                const subtasks = parseSubtasks(task.subtasks);
-                let subtasksHtml = '';
-                if (subtasks.length > 0) {
-                    subtasksHtml = '<div class="subtasks-container">';
-                    subtasks.forEach((sub, subIndex) => {
-                        subtasksHtml += `
-                            <div class="subtask-item ${sub.done ? 'done' : ''}">
-                                <input type="checkbox" ${sub.done ? 'checked' : ''} onchange="toggleSubtask(${index}, ${subIndex})">
-                                <span class="subtask-text">${sub.text}</span>
-                                <button class="subtask-delete" onclick="deleteSubtask(${index}, ${subIndex})">✖</button>
-                            </div>
-                        `;
-                    });
-                    subtasksHtml += '</div>';
-                }
+                let repeatHtml = '';
+                if (task.repeat_type === 'daily') repeatHtml = '<span class="repeat-badge">Каждый день</span>';
+                if (task.repeat_type === 'weekly') repeatHtml = '<span class="repeat-badge">Каждую неделю</span>';
 
                 div.innerHTML = `
                     <div class="task-header">
                         <div class="task-title-wrapper">
                             <div class="title-row">
                                 <span class="task-title">${task.title}</span>
-                                <span class="priority-badge">${getPriorityName(task.priority || 'med')}</span>
+                                <span class="priority-badge">${task.priority}</span>
+                                ${repeatHtml}
                             </div>
-                            ${dateHtml}
                         </div>
                         <div class="task-actions">
                             <button class="check-btn ${isDone ? 'done' : ''}" onclick="toggleComplete(${index})">✓</button>
                             <button class="delete-btn" onclick="deleteTask(${index})">🗑️</button>
                         </div>
                     </div>
-                    
-                    ${subtasksHtml}
-
-                    <div class="add-subtask-row">
-                        <input type="text" id="subInput_${index}" placeholder="Добавить шаг..." onkeypress="if(event.key==='Enter') addSubtask(${index})">
-                        <button onclick="addSubtask(${index})">+</button>
-                    </div>
-
                     <div class="progress-controls">
                         <input type="range" min="0" max="100" value="${task.progress}" oninput="updateProgress(${index}, this.value)" onchange="saveToServer(${index})">
-                        <input type="number" min="0" max="100" value="${task.progress}" onchange="updateProgress(${index}, this.value); saveToServer(${index})">
-                        <span class="percent-sign">%</span>
+                        <span class="percent-sign">${task.progress}%</span>
                     </div>
                 `;
                 taskList.appendChild(div);
             });
         }
 
-        async function addSubtask(taskIndex) {
-            const input = document.getElementById(`subInput_${taskIndex}`);
-            const text = input.value.trim();
-            if (!text) return;
-            const task = tasks[taskIndex];
-            let subtasks = parseSubtasks(task.subtasks);
-            subtasks.push({ text: text, done: false });
-            task.subtasks = JSON.stringify(subtasks);
-            input.value = '';
-            saveLocal(); renderTasks(); saveToServer(taskIndex);
-        }
-
-        async function toggleSubtask(taskIndex, subIndex) {
-            const task = tasks[taskIndex];
-            let subtasks = parseSubtasks(task.subtasks);
-            subtasks[subIndex].done = !subtasks[subIndex].done;
-            task.subtasks = JSON.stringify(subtasks);
-            const doneCount = subtasks.filter(s => s.done).length;
-            task.progress = Math.round((doneCount / subtasks.length) * 100);
-            saveLocal(); renderTasks(); saveToServer(taskIndex);
-        }
-
-        async function deleteSubtask(taskIndex, subIndex) {
-            const task = tasks[taskIndex];
-            let subtasks = parseSubtasks(task.subtasks);
-            subtasks.splice(subIndex, 1);
-            task.subtasks = JSON.stringify(subtasks);
-            if (subtasks.length > 0) {
-                const doneCount = subtasks.filter(s => s.done).length;
-                task.progress = Math.round((doneCount / subtasks.length) * 100);
-            }
-            saveLocal(); renderTasks(); saveToServer(taskIndex);
-        }
-
         async function addTask() {
             const title = taskInput.value.trim();
             if (!title) return;
-            const newTask = { title: title, priority: priorityInput.value, progress: 0, created_at: new Date().toISOString(), subtasks: '[]', tempId: Date.now() };
+            const newTask = { 
+                title: title, 
+                priority: priorityInput.value, 
+                repeat_type: repeatInput.value,
+                progress: 0, 
+                created_at: new Date().toISOString(), 
+                subtasks: '[]',
+                tempId: Date.now() 
+            };
             tasks.unshift(newTask);
             taskInput.value = '';
             saveLocal(); renderTasks();
@@ -399,23 +272,16 @@
             if (navigator.onLine && authToken) {
                 try {
                     const response = await fetch(`${API_BASE}/api/tasks`, { 
-                        method: 'POST', 
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` }, 
+                        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` }, 
                         body: JSON.stringify(newTask) 
                     });
-                    if (response.ok) {
-                        const data = await response.json();
-                        newTask.id = data.id;
-                        saveLocal();
-                    }
+                    if (response.ok) { const data = await response.json(); newTask.id = data.id; saveLocal(); }
                 } catch (e) { console.log("Локально"); }
             }
         }
 
         function updateProgress(index, value) {
             let val = parseInt(value);
-            if (isNaN(val)) val = 0;
-            if (val < 0) val = 0; if (val > 100) val = 100;
             tasks[index].progress = val;
             saveLocal(); renderTasks(); 
         }
@@ -425,24 +291,29 @@
             if (!task.id || !navigator.onLine || !authToken) return;
             try {
                 await fetch(`${API_BASE}/api/tasks/${task.id}`, { 
-                    method: 'PUT', 
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` }, 
-                    body: JSON.stringify({ id: task.id, progress: task.progress, priority: task.priority, subtasks: task.subtasks }) 
+                    method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` }, 
+                    body: JSON.stringify({ 
+                        id: task.id, progress: task.progress, priority: task.priority, 
+                        subtasks: task.subtasks, repeat_type: task.repeat_type 
+                    }) 
                 });
             } catch (e) { console.log("Офлайн"); }
         }
 
         function toggleComplete(index) {
-            tasks[index].progress = tasks[index].progress === 100 ? 0 : 100;
-            let subtasks = parseSubtasks(tasks[index].subtasks);
-            if (tasks[index].progress === 100) subtasks.forEach(s => s.done = true);
-            else subtasks.forEach(s => s.done = false);
-            tasks[index].subtasks = JSON.stringify(subtasks);
+            const task = tasks[index];
+            if (task.progress === 100 && task.repeat_type !== 'none') {
+                task.progress = 0;
+                task.created_at = new Date().toISOString();
+                alert('Задача выполнена! Прогресс сброшен для следующего повторения.');
+            } else {
+                task.progress = task.progress === 100 ? 0 : 100;
+            }
             saveLocal(); renderTasks(); saveToServer(index);
         }
 
         async function deleteTask(index) {
-            if (!confirm('Удалить эту задачу?')) return;
+            if (!confirm('Удалить?')) return;
             const task = tasks[index];
             tasks.splice(index, 1);
             saveLocal(); renderTasks();
@@ -454,8 +325,6 @@
         addBtn.addEventListener('click', addTask);
         taskInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') addTask(); });
         
-        // Запуск
-        updateOnlineStatus();
         checkAuth();
     </script>
 </body>
