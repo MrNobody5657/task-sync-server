@@ -12,21 +12,30 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body { background-color: var(--bg); color: var(--text); padding: 20px; padding-bottom: 80px; }
         h1 { font-size: 24px; margin-bottom: 20px; color: var(--accent); text-align: center; }
-        .input-group { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        
+        .input-group { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
         input[type="text"] { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #333; background-color: var(--card); color: var(--text); font-size: 16px; min-width: 150px; }
         input[type="text"]:focus { outline: none; border-color: var(--accent); }
         select { padding: 12px; border-radius: 8px; border: 1px solid #333; background-color: var(--card); color: var(--text); font-size: 14px; cursor: pointer; }
         select:focus { outline: none; border-color: var(--accent); }
         button.add-btn { padding: 12px 20px; border: none; border-radius: 8px; background-color: var(--accent); color: #000; font-weight: bold; font-size: 16px; cursor: pointer; flex-basis: 100%; }
         button.add-btn:active { opacity: 0.7; }
+
+        .controls { display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px; }
+        .filter-btn { padding: 8px 16px; border-radius: 20px; border: 1px solid #444; background: transparent; color: var(--text); font-size: 14px; cursor: pointer; white-space: nowrap; }
+        .filter-btn.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: bold; }
+        
         .task-list { display: flex; flex-direction: column; gap: 10px; }
         .task-item { background-color: var(--card); padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 12px; border-left: 4px solid #333; transition: all 0.3s ease; position: relative; }
         .task-item.p-high { border-left-color: var(--priority-high); }
         .task-item.p-med { border-left-color: var(--priority-med); }
         .task-item.p-low { border-left-color: var(--priority-low); }
-        .task-item.done { opacity: 0.5; }
-        .task-item.done .task-title { text-decoration: line-through; }
-        .task-item.done .priority-badge { opacity: 0.5; }
+        
+        /* Архивный вид для выполненных */
+        .task-item.done { opacity: 0.5; background-color: #181818; border-left-color: #444; }
+        .task-item.done .task-title { text-decoration: line-through; color: #888; }
+        .task-item.done .priority-badge { filter: grayscale(1); opacity: 0.5; }
+        
         .task-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
         .task-title-wrapper { flex: 1; }
         .title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -46,7 +55,7 @@
         input[type="range"] { flex: 1; -webkit-appearance: none; background: transparent; height: 6px; }
         input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #333; border-radius: 3px; }
         input[type="range"]::-webkit-slider-thumb { height: 16px; width: 16px; border-radius: 50%; background: var(--accent); cursor: pointer; -webkit-appearance: none; margin-top: -5px; }
-        .task-item.done input[type="range"]::-webkit-slider-thumb { background: var(--success); }
+        .task-item.done input[type="range"]::-webkit-slider-thumb { background: #555; }
         input[type="number"] { width: 50px; padding: 4px; border-radius: 4px; border: 1px solid #444; background: var(--bg); color: var(--text); text-align: center; font-size: 14px; }
         input[type="number"]:focus { outline: none; border-color: var(--accent); }
         .percent-sign { font-size: 14px; color: #888; }
@@ -55,6 +64,7 @@
 </head>
 <body>
     <h1>📱 Мои Задачи</h1>
+    
     <div class="input-group">
         <input type="text" id="taskInput" placeholder="Что нужно сделать?" autocomplete="off">
         <select id="priorityInput">
@@ -64,32 +74,53 @@
         </select>
         <button class="add-btn" id="addBtn">+ Добавить</button>
     </div>
+
+    <div class="controls">
+        <button class="filter-btn active" onclick="setFilter('all')">Все</button>
+        <button class="filter-btn" onclick="setFilter('active')">Активные</button>
+        <button class="filter-btn" onclick="setFilter('done')">📦 Архив</button>
+        <button class="filter-btn" onclick="toggleSort()" id="sortBtn" style="margin-left: auto;">Сначала новые ↓</button>
+    </div>
+
     <div class="task-list" id="taskList"></div>
 
     <script>
-        // Адрес твоего облачного сервера на Render
         const API_URL = 'https://task-sync-server.onrender.com/api/tasks';
         let tasks = [];
+        let currentFilter = 'all'; 
+        let currentSort = 'new';   
         
         const taskInput = document.getElementById('taskInput');
         const priorityInput = document.getElementById('priorityInput');
         const addBtn = document.getElementById('addBtn');
         const taskList = document.getElementById('taskList');
+        const sortBtn = document.getElementById('sortBtn');
 
-        // Загрузка задач с сервера
         async function loadTasks() {
             taskList.innerHTML = '<div class="empty-msg">Загрузка с сервера... (до 50 сек)</div>';
             try {
                 const response = await fetch(API_URL);
                 if (response.ok) {
-                    const serverTasks = await response.json();
-                    tasks = serverTasks.sort((a, b) => b.id - a.id);
+                    tasks = await response.json();
                     renderTasks();
                 }
             } catch (e) {
                 console.error("Ошибка загрузки", e);
-                taskList.innerHTML = '<div class="empty-msg">Нет связи с сервером. Попробуйте позже.</div>';
+                taskList.innerHTML = '<div class="empty-msg">Нет связи с сервером.</div>';
             }
+        }
+
+        function setFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            renderTasks();
+        }
+
+        function toggleSort() {
+            currentSort = currentSort === 'new' ? 'priority' : 'new';
+            sortBtn.innerText = currentSort === 'new' ? 'Сначала новые ↓' : 'По важности ↓';
+            renderTasks();
         }
 
         function formatDate(isoString) {
@@ -103,20 +134,38 @@
 
         function getPriorityClass(p) { return p === 'high' ? 'p-high' : p === 'low' ? 'p-low' : 'p-med'; }
         function getPriorityName(p) { return p === 'high' ? 'Высокий' : p === 'low' ? 'Низкий' : 'Средний'; }
+        function getPriorityWeight(p) { return p === 'high' ? 3 : p === 'med' ? 2 : 1; }
 
         function renderTasks() {
             taskList.innerHTML = '';
-            if (tasks.length === 0) {
-                taskList.innerHTML = '<div class="empty-msg">Пока задач нет. Добавь первую!</div>';
+            
+            let filteredTasks = tasks.filter(task => {
+                if (currentFilter === 'active') return task.progress < 100;
+                if (currentFilter === 'done') return task.progress === 100;
+                return true;
+            });
+
+            if (currentSort === 'new') {
+                filteredTasks.sort((a, b) => b.id - a.id);
+            } else if (currentSort === 'priority') {
+                filteredTasks.sort((a, b) => getPriorityWeight(b.priority) - getPriorityWeight(a.priority));
+            }
+
+            if (filteredTasks.length === 0) {
+                taskList.innerHTML = `<div class="empty-msg">${currentFilter === 'done' ? 'Архив пуст' : 'Здесь пока пусто'}</div>`;
                 return;
             }
-            tasks.forEach((task, index) => {
+
+            filteredTasks.forEach((task) => {
+                const index = tasks.findIndex(t => t.id === task.id); 
                 const div = document.createElement('div');
                 const pClass = getPriorityClass(task.priority || 'med');
                 const isDone = task.progress === 100 ? 'done' : '';
                 div.className = `task-item ${pClass} ${isDone}`;
+                
                 const dateStr = formatDate(task.created_at);
                 const dateHtml = dateStr ? `<span class="task-date">${dateStr}</span>` : '';
+                
                 div.innerHTML = `
                     <div class="task-header">
                         <div class="task-title-wrapper">
@@ -151,9 +200,9 @@
                 if (response.ok) {
                     const data = await response.json();
                     newTask.id = data.id;
-                    tasks.unshift(newTask);
+                    tasks.push(newTask); 
                     renderTasks();
-                } else { alert("Ошибка сохранения"); }
+                }
             } catch (e) { alert("Сервер спит, попробуйте через минуту"); }
         }
 
@@ -162,14 +211,7 @@
             if (isNaN(val)) val = 0;
             if (val < 0) val = 0; if (val > 100) val = 100;
             tasks[index].progress = val;
-            const taskDiv = taskList.children[index];
-            const checkBtn = taskDiv.querySelector('.check-btn');
-            if (val === 100) { taskDiv.classList.add('done'); checkBtn.classList.add('done'); }
-            else { taskDiv.classList.remove('done'); checkBtn.classList.remove('done'); }
-            const rangeInput = taskDiv.querySelector('input[type="range"]');
-            const numberInput = taskDiv.querySelector('input[type="number"]');
-            if (rangeInput.value != val) rangeInput.value = val;
-            if (numberInput.value != val) numberInput.value = val;
+            renderTasks(); 
         }
 
         async function saveToServer(index) {
