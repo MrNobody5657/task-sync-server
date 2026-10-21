@@ -31,7 +31,6 @@
         .task-item.p-med { border-left-color: var(--priority-med); }
         .task-item.p-low { border-left-color: var(--priority-low); }
         
-        /* Архивный вид для выполненных */
         .task-item.done { opacity: 0.5; background-color: #181818; border-left-color: #444; }
         .task-item.done .task-title { text-decoration: line-through; color: #888; }
         .task-item.done .priority-badge { filter: grayscale(1); opacity: 0.5; }
@@ -51,6 +50,7 @@
         .check-btn.done { background-color: var(--success); border-color: var(--success); color: #000; }
         .delete-btn { background: none; border: none; font-size: 20px; cursor: pointer; padding: 5px; border-radius: 5px; }
         .delete-btn:active { background-color: #333; }
+        
         .progress-controls { display: flex; align-items: center; gap: 10px; background: #252525; padding: 8px 12px; border-radius: 8px; }
         input[type="range"] { flex: 1; -webkit-appearance: none; background: transparent; height: 6px; }
         input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #333; border-radius: 3px; }
@@ -59,6 +59,19 @@
         input[type="number"] { width: 50px; padding: 4px; border-radius: 4px; border: 1px solid #444; background: var(--bg); color: var(--text); text-align: center; font-size: 14px; }
         input[type="number"]:focus { outline: none; border-color: var(--accent); }
         .percent-sign { font-size: 14px; color: #888; }
+
+        .subtasks-container { border-top: 1px dashed #333; padding-top: 10px; margin-top: 5px; }
+        .subtask-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+        .subtask-item input[type="checkbox"] { appearance: none; width: 18px; height: 18px; border: 2px solid #555; border-radius: 4px; cursor: pointer; position: relative; }
+        .subtask-item input[type="checkbox"]:checked { background-color: var(--accent); border-color: var(--accent); }
+        .subtask-item input[type="checkbox"]:checked::after { content: '✔'; position: absolute; top: -2px; left: 2px; color: #000; font-size: 14px; font-weight: bold; }
+        .subtask-text { font-size: 14px; color: #ccc; flex: 1; }
+        .subtask-item.done .subtask-text { text-decoration: line-through; color: #666; }
+        .subtask-delete { background: none; border: none; color: #666; cursor: pointer; font-size: 14px; }
+        .add-subtask-row { display: flex; gap: 5px; margin-top: 5px; }
+        .add-subtask-row input { flex: 1; padding: 6px; font-size: 12px; border-radius: 4px; border: 1px solid #444; background: #121212; color: #fff; }
+        .add-subtask-row button { padding: 4px 10px; border-radius: 4px; border: none; background: var(--accent); color: #000; cursor: pointer; font-size: 12px; }
+        
         .empty-msg { text-align: center; color: #666; margin-top: 40px; font-style: italic; }
     </style>
 </head>
@@ -136,6 +149,10 @@
         function getPriorityName(p) { return p === 'high' ? 'Высокий' : p === 'low' ? 'Низкий' : 'Средний'; }
         function getPriorityWeight(p) { return p === 'high' ? 3 : p === 'med' ? 2 : 1; }
 
+        function parseSubtasks(str) {
+            try { return str ? JSON.parse(str) : []; } catch(e) { return []; }
+        }
+
         function renderTasks() {
             taskList.innerHTML = '';
             
@@ -166,6 +183,22 @@
                 const dateStr = formatDate(task.created_at);
                 const dateHtml = dateStr ? `<span class="task-date">${dateStr}</span>` : '';
                 
+                const subtasks = parseSubtasks(task.subtasks);
+                let subtasksHtml = '';
+                if (subtasks.length > 0) {
+                    subtasksHtml = '<div class="subtasks-container">';
+                    subtasks.forEach((sub, subIndex) => {
+                        subtasksHtml += `
+                            <div class="subtask-item ${sub.done ? 'done' : ''}">
+                                <input type="checkbox" ${sub.done ? 'checked' : ''} onchange="toggleSubtask(${index}, ${subIndex})">
+                                <span class="subtask-text">${sub.text}</span>
+                                <button class="subtask-delete" onclick="deleteSubtask(${index}, ${subIndex})">✖</button>
+                            </div>
+                        `;
+                    });
+                    subtasksHtml += '</div>';
+                }
+
                 div.innerHTML = `
                     <div class="task-header">
                         <div class="task-title-wrapper">
@@ -180,6 +213,14 @@
                             <button class="delete-btn" onclick="deleteTask(${index})">🗑️</button>
                         </div>
                     </div>
+                    
+                    ${subtasksHtml}
+
+                    <div class="add-subtask-row">
+                        <input type="text" id="subInput_${index}" placeholder="Добавить шаг..." onkeypress="if(event.key==='Enter') addSubtask(${index})">
+                        <button onclick="addSubtask(${index})">+</button>
+                    </div>
+
                     <div class="progress-controls">
                         <input type="range" min="0" max="100" value="${task.progress}" oninput="updateProgress(${index}, this.value)" onchange="saveToServer(${index})">
                         <input type="number" min="0" max="100" value="${task.progress}" onchange="updateProgress(${index}, this.value); saveToServer(${index})">
@@ -190,10 +231,56 @@
             });
         }
 
+        async function addSubtask(taskIndex) {
+            const input = document.getElementById(`subInput_${taskIndex}`);
+            const text = input.value.trim();
+            if (!text) return;
+
+            const task = tasks[taskIndex];
+            let subtasks = parseSubtasks(task.subtasks);
+            subtasks.push({ text: text, done: false });
+            
+            task.subtasks = JSON.stringify(subtasks);
+            input.value = '';
+            renderTasks();
+            saveToServer(taskIndex);
+        }
+
+        async function toggleSubtask(taskIndex, subIndex) {
+            const task = tasks[taskIndex];
+            let subtasks = parseSubtasks(task.subtasks);
+            
+            subtasks[subIndex].done = !subtasks[subIndex].done;
+            task.subtasks = JSON.stringify(subtasks);
+
+            const doneCount = subtasks.filter(s => s.done).length;
+            const totalCount = subtasks.length;
+            task.progress = Math.round((doneCount / totalCount) * 100);
+
+            renderTasks();
+            saveToServer(taskIndex);
+        }
+
+        async function deleteSubtask(taskIndex, subIndex) {
+            const task = tasks[taskIndex];
+            let subtasks = parseSubtasks(task.subtasks);
+            subtasks.splice(subIndex, 1);
+            
+            task.subtasks = JSON.stringify(subtasks);
+            
+            if (subtasks.length > 0) {
+                const doneCount = subtasks.filter(s => s.done).length;
+                task.progress = Math.round((doneCount / subtasks.length) * 100);
+            }
+            
+            renderTasks();
+            saveToServer(taskIndex);
+        }
+
         async function addTask() {
             const title = taskInput.value.trim();
             if (!title) return;
-            const newTask = { title: title, priority: priorityInput.value, progress: 0, created_at: new Date().toISOString() };
+            const newTask = { title: title, priority: priorityInput.value, progress: 0, created_at: new Date().toISOString(), subtasks: '[]' };
             taskInput.value = '';
             try {
                 const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newTask) });
@@ -218,12 +305,29 @@
             const task = tasks[index];
             if (!task.id) return;
             try {
-                await fetch(`${API_URL}/${task.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, progress: task.progress, priority: task.priority }) });
+                await fetch(`${API_URL}/${task.id}`, { 
+                    method: 'PUT', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ 
+                        id: task.id, 
+                        progress: task.progress, 
+                        priority: task.priority,
+                        subtasks: task.subtasks
+                    }) 
+                });
             } catch (e) { console.log("Офлайн"); }
         }
 
         function toggleComplete(index) {
             tasks[index].progress = tasks[index].progress === 100 ? 0 : 100;
+            let subtasks = parseSubtasks(tasks[index].subtasks);
+            if (tasks[index].progress === 100) {
+                subtasks.forEach(s => s.done = true);
+            } else {
+                subtasks.forEach(s => s.done = false);
+            }
+            tasks[index].subtasks = JSON.stringify(subtasks);
+            
             renderTasks();
             saveToServer(index);
         }

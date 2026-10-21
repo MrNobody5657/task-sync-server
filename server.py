@@ -7,10 +7,9 @@ import uvicorn
 
 app = FastAPI()
 
-# Разрешаем нашему PWA-приложению делать запросы к серверу
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Пока разрешаем всем (для разработки)
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -26,7 +25,8 @@ def init_db():
             title TEXT NOT NULL,
             priority TEXT DEFAULT 'med',
             progress INTEGER DEFAULT 0,
-            created_at TEXT
+            created_at TEXT,
+            subtasks TEXT DEFAULT '[]'
         )
     """)
     conn.commit()
@@ -34,18 +34,18 @@ def init_db():
 
 init_db()
 
-# Модель данных для получения новой задачи
 class TaskCreate(BaseModel):
     title: str
     priority: str
     progress: int
     created_at: str
+    subtasks: str = '[]'
 
-# Модель данных для обновления задачи
 class TaskUpdate(BaseModel):
     id: int
     progress: int
     priority: str
+    subtasks: str = '[]'
 
 @app.get("/api/tasks", response_model=List[dict])
 def get_tasks():
@@ -62,8 +62,8 @@ def create_task(task: TaskCreate):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute(
-        "INSERT INTO tasks (title, priority, progress, created_at) VALUES (?, ?, ?, ?)",
-        (task.title, task.priority, task.progress, task.created_at)
+        "INSERT INTO tasks (title, priority, progress, created_at, subtasks) VALUES (?, ?, ?, ?, ?)",
+        (task.title, task.priority, task.progress, task.created_at, task.subtasks)
     )
     conn.commit()
     task_id = c.lastrowid
@@ -75,8 +75,8 @@ def update_task(task_id: int, task: TaskUpdate):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute(
-        "UPDATE tasks SET progress = ?, priority = ? WHERE id = ?",
-        (task.progress, task.priority, task_id)
+        "UPDATE tasks SET progress = ?, priority = ?, subtasks = ? WHERE id = ?",
+        (task.progress, task.priority, task.subtasks, task_id)
     )
     conn.commit()
     conn.close()
@@ -92,5 +92,4 @@ def delete_task(task_id: int):
     return {"status": "ok"}
 
 if __name__ == "__main__":
-    # Запускаем сервер на порту 8000
     uvicorn.run(app, host="0.0.0.0", port=8000)
