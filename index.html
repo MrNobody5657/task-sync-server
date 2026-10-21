@@ -13,7 +13,18 @@
         body { background-color: var(--bg); color: var(--text); padding: 20px; padding-bottom: 80px; }
         h1 { font-size: 24px; margin-bottom: 20px; color: var(--accent); text-align: center; }
         
-        /* Индикатор офлайн-режима */
+        /* Экраны */
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        /* Экран входа */
+        .auth-container { max-width: 400px; margin: 50px auto; text-align: center; }
+        .auth-container input { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #333; background: var(--card); color: var(--text); font-size: 16px; }
+        .auth-container button { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--accent); color: #000; font-weight: bold; font-size: 16px; cursor: pointer; margin-bottom: 10px; }
+        .auth-container button:active { opacity: 0.7; }
+        .auth-link { color: var(--accent); cursor: pointer; text-decoration: underline; font-size: 14px; }
+
+        /* Офлайн */
         .offline-banner { background: #cf6679; color: #000; text-align: center; padding: 8px; font-size: 14px; font-weight: bold; border-radius: 8px; margin-bottom: 15px; display: none; }
         .offline-banner.active { display: block; }
 
@@ -34,7 +45,6 @@
         .task-item.p-high { border-left-color: var(--priority-high); }
         .task-item.p-med { border-left-color: var(--priority-med); }
         .task-item.p-low { border-left-color: var(--priority-low); }
-        
         .task-item.done { opacity: 0.5; background-color: #181818; border-left-color: #444; }
         .task-item.done .task-title { text-decoration: line-through; color: #888; }
         .task-item.done .priority-badge { filter: grayscale(1); opacity: 0.5; }
@@ -78,39 +88,59 @@
         
         .empty-msg { text-align: center; color: #666; margin-top: 40px; font-style: italic; }
         .sync-status { text-align: center; font-size: 12px; color: #666; margin-top: 10px; }
+        
+        .logout-btn { position: absolute; top: 20px; right: 20px; background: none; border: none; color: #cf6679; cursor: pointer; font-size: 14px; }
     </style>
-</head>
-<body>
-    <div id="offlineBanner" class="offline-banner">⚡ Офлайн-режим (изменения сохранятся локально)</div>
-
-    <h1>📱 Мои Задачи</h1>
-    
-    <div class="input-group">
-        <input type="text" id="taskInput" placeholder="Что нужно сделать?" autocomplete="off">
-        <select id="priorityInput">
-            <option value="low">Низкий</option>
-            <option value="med" selected>Средний</option>
-            <option value="high">Высокий</option>
-        </select>
-        <button class="add-btn" id="addBtn">+ Добавить</button>
+</head><body>
+    <!-- ЭКРАН ВХОДА -->
+    <div id="authScreen" class="screen active">
+        <div class="auth-container">
+            <h1>📱 Мои Задачи</h1>
+            <p style="margin-bottom: 20px; color: #888;">Войдите, чтобы синхронизировать задачи</p>
+            <input type="email" id="authEmail" placeholder="Email" autocomplete="email">
+            <input type="password" id="authPassword" placeholder="Пароль" autocomplete="current-password">
+            <button id="loginBtn">Войти</button>
+            <button id="registerBtn" style="background: transparent; border: 1px solid #444; color: #fff;">Зарегистрироваться</button>
+            <p id="authError" style="color: #cf6679; margin-top: 10px; font-size: 14px;"></p>
+        </div>
     </div>
 
-    <div class="controls">
-        <button class="filter-btn active" onclick="setFilter('all')">Все</button>
-        <button class="filter-btn" onclick="setFilter('active')">Активные</button>
-        <button class="filter-btn" onclick="setFilter('done')">📦 Архив</button>
-        <button class="filter-btn" onclick="toggleSort()" id="sortBtn" style="margin-left: auto;">Сначала новые ↓</button>
-    </div>
+    <!-- ГЛАВНЫЙ ЭКРАН -->
+    <div id="mainScreen" class="screen">
+        <button class="logout-btn" id="logoutBtn">Выйти</button>
+        <div id="offlineBanner" class="offline-banner">⚡ Офлайн-режим (изменения сохранятся локально)</div>
 
-    <div class="task-list" id="taskList"></div>
-    <div class="sync-status" id="syncStatus"></div>
+        <h1>📱 Мои Задачи</h1>
+        
+        <div class="input-group">
+            <input type="text" id="taskInput" placeholder="Что нужно сделать?" autocomplete="off">
+            <select id="priorityInput">
+                <option value="low">Низкий</option>
+                <option value="med" selected>Средний</option>
+                <option value="high">Высокий</option>
+            </select>
+            <button class="add-btn" id="addBtn">+ Добавить</button>
+        </div>
 
-    <script>
-        const API_URL = 'https://task-sync-server.onrender.com/api/tasks';
+        <div class="controls">
+            <button class="filter-btn active" onclick="setFilter('all')">Все</button>
+            <button class="filter-btn" onclick="setFilter('active')">Активные</button>
+            <button class="filter-btn" onclick="setFilter('done')">📦 Архив</button>
+            <button class="filter-btn" onclick="toggleSort()" id="sortBtn" style="margin-left: auto;">Сначала новые ↓</button>
+        </div>
+
+        <div class="task-list" id="taskList"></div>
+        <div class="sync-status" id="syncStatus"></div>
+    </div>    <script>
+        const API_BASE = 'https://task-sync-server.onrender.com';
         let tasks = [];
         let currentFilter = 'all'; 
         let currentSort = 'new';   
-        
+        let authToken = localStorage.getItem('auth_token');
+
+        // Элементы DOM
+        const authScreen = document.getElementById('authScreen');
+        const mainScreen = document.getElementById('mainScreen');
         const taskInput = document.getElementById('taskInput');
         const priorityInput = document.getElementById('priorityInput');
         const addBtn = document.getElementById('addBtn');
@@ -118,75 +148,109 @@
         const sortBtn = document.getElementById('sortBtn');
         const offlineBanner = document.getElementById('offlineBanner');
         const syncStatus = document.getElementById('syncStatus');
+        const authError = document.getElementById('authError');
 
-        // --- ЛОКАЛЬНОЕ ХРАНИЛИЩЕ ---
-        function saveLocal() {
-            localStorage.setItem('my_tasks_offline', JSON.stringify(tasks));
-        }
-        function loadLocal() {
-            const local = localStorage.getItem('my_tasks_offline');
-            return local ? JSON.parse(local) : [];
+        // --- АВТОРИЗАЦИЯ ---
+        function checkAuth() {
+            if (authToken) {
+                authScreen.classList.remove('active');
+                mainScreen.classList.add('active');
+                loadTasks();
+            } else {
+                authScreen.classList.add('active');
+                mainScreen.classList.remove('active');
+            }
         }
 
-        // --- СЕТЬ ---
+        document.getElementById('loginBtn').addEventListener('click', async () => {
+            const email = document.getElementById('authEmail').value;
+            const password = document.getElementById('authPassword').value;
+            authError.innerText = '';
+            
+            const formData = new URLSearchParams();
+            formData.append('username', email);
+            formData.append('password', password);
+
+            try {
+                const res = await fetch(`${API_BASE}/api/login`, { method: 'POST', body: formData });
+                if (res.ok) {
+                    const data = await res.json();
+                    authToken = data.access_token;
+                    localStorage.setItem('auth_token', authToken);
+                    checkAuth();
+                } else {
+                    authError.innerText = 'Неверный email или пароль';
+                }
+            } catch (e) { authError.innerText = 'Ошибка сети. Сервер спит?'; }
+        });
+
+        document.getElementById('registerBtn').addEventListener('click', async () => {
+            const email = document.getElementById('authEmail').value;
+            const password = document.getElementById('authPassword').value;
+            authError.innerText = '';
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                if (res.ok) {
+                    alert('Регистрация успешна! Теперь войдите.');
+                } else {
+                    const data = await res.json();
+                    authError.innerText = data.detail || 'Ошибка регистрации';
+                }
+            } catch (e) { authError.innerText = 'Ошибка сети. Сервер спит?'; }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            authToken = null;
+            localStorage.removeItem('auth_token');
+            checkAuth();
+        });
+
+        // --- ОФЛАЙН И СЕТЬ ---
         function updateOnlineStatus() {
             if (navigator.onLine) {
                 offlineBanner.classList.remove('active');
                 syncStatus.innerText = 'Синхронизация...';
-                syncData();
+                if (authToken) loadTasks();
             } else {
                 offlineBanner.classList.add('active');
                 syncStatus.innerText = 'Офлайн. Данные сохранены на устройстве.';
             }
         }
-
         window.addEventListener('online', updateOnlineStatus);
         window.addEventListener('offline', updateOnlineStatus);
 
-        // --- ЗАГРУЗКА ДАННЫХ ---
+        // --- РАБОТА С ДАННЫМИ ---
+        function saveLocal() { localStorage.setItem('my_tasks_offline', JSON.stringify(tasks)); }
+        function loadLocal() { const local = localStorage.getItem('my_tasks_offline'); return local ? JSON.parse(local) : []; }
+
         async function loadTasks() {
-            // 1. Мгновенно показываем локальные данные (мгновенный запуск)
             tasks = loadLocal();
             renderTasks();
 
-            // 2. Пытаемся получить свежие данные из облака
+            if (!authToken || !navigator.onLine) return;
+
             try {
-                const response = await fetch(API_URL);
+                const response = await fetch(`${API_BASE}/api/tasks`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
                 if (response.ok) {
-                    const serverTasks = await response.json();
-                    
-                    // Простое разрешение конфликтов: если локальная задача новее, оставляем её
-                    // Для простоты сейчас просто берем серверные, но помечаем локальные "грязные"
-                    // В реальном приложении тут нужна сложная логика слияния.
-                    
-                    tasks = serverTasks; 
+                    tasks = await response.json();
                     saveLocal();
                     renderTasks();
-                    syncStatus.innerText = 'Данные синхронизированы с облаком.';
+                    syncStatus.innerText = 'Данные синхронизированы.';
+                } else if (response.status === 401) {
+                    localStorage.removeItem('auth_token');
+                    location.reload();
                 }
             } catch (e) {
-                console.error("Нет связи с сервером", e);
-                syncStatus.innerText = 'Не удалось связаться с сервером. Работаем офлайн.';
+                console.error("Нет связи", e);
+                syncStatus.innerText = 'Офлайн-режим (не удалось обновить).';
             }
-        }
-
-        // --- СИНХРОНИЗАЦИЯ (ОТПРАВКА) ---
-        async function syncData() {
-            if (!navigator.onLine) return;
-            
-            // Ищем задачи без id (новые, созданные офлайн)
-            const offlineNewTasks = tasks.filter(t => !t.id);
-            for (const task of offlineNewTasks) {
-                try {
-                    const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(task) });
-                    if (response.ok) {
-                        const data = await response.json();
-                        task.id = data.id; // Присваиваем реальный ID
-                        saveLocal();
-                    }
-                } catch (e) { console.log("Не удалось синхронизировать новую задачу"); }
-            }
-            syncStatus.innerText = 'Все изменения сохранены.';
         }
 
         function setFilter(filter) {
@@ -214,25 +278,18 @@
         function getPriorityClass(p) { return p === 'high' ? 'p-high' : p === 'low' ? 'p-low' : 'p-med'; }
         function getPriorityName(p) { return p === 'high' ? 'Высокий' : p === 'low' ? 'Низкий' : 'Средний'; }
         function getPriorityWeight(p) { return p === 'high' ? 3 : p === 'med' ? 2 : 1; }
-
-        function parseSubtasks(str) {
-            try { return str ? JSON.parse(str) : []; } catch(e) { return []; }
-        }
+        function parseSubtasks(str) { try { return str ? JSON.parse(str) : []; } catch(e) { return []; } }
 
         function renderTasks() {
             taskList.innerHTML = '';
-            
             let filteredTasks = tasks.filter(task => {
                 if (currentFilter === 'active') return task.progress < 100;
                 if (currentFilter === 'done') return task.progress === 100;
                 return true;
             });
 
-            if (currentSort === 'new') {
-                filteredTasks.sort((a, b) => (b.id || Date.now()) - (a.id || Date.now()));
-            } else if (currentSort === 'priority') {
-                filteredTasks.sort((a, b) => getPriorityWeight(b.priority) - getPriorityWeight(a.priority));
-            }
+            if (currentSort === 'new') filteredTasks.sort((a, b) => (b.id || 0) - (a.id || 0));
+            else if (currentSort === 'priority') filteredTasks.sort((a, b) => getPriorityWeight(b.priority) - getPriorityWeight(a.priority));
 
             if (filteredTasks.length === 0) {
                 taskList.innerHTML = `<div class="empty-msg">${currentFilter === 'done' ? 'Архив пуст' : 'Здесь пока пусто'}</div>`;
@@ -301,80 +358,57 @@
             const input = document.getElementById(`subInput_${taskIndex}`);
             const text = input.value.trim();
             if (!text) return;
-
             const task = tasks[taskIndex];
             let subtasks = parseSubtasks(task.subtasks);
             subtasks.push({ text: text, done: false });
-            
             task.subtasks = JSON.stringify(subtasks);
             input.value = '';
-            saveLocal();
-            renderTasks();
-            saveToServer(taskIndex);
+            saveLocal(); renderTasks(); saveToServer(taskIndex);
         }
 
         async function toggleSubtask(taskIndex, subIndex) {
             const task = tasks[taskIndex];
             let subtasks = parseSubtasks(task.subtasks);
-            
             subtasks[subIndex].done = !subtasks[subIndex].done;
             task.subtasks = JSON.stringify(subtasks);
-
             const doneCount = subtasks.filter(s => s.done).length;
-            const totalCount = subtasks.length;
-            task.progress = Math.round((doneCount / totalCount) * 100);
-
-            saveLocal();
-            renderTasks();
-            saveToServer(taskIndex);
+            task.progress = Math.round((doneCount / subtasks.length) * 100);
+            saveLocal(); renderTasks(); saveToServer(taskIndex);
         }
 
         async function deleteSubtask(taskIndex, subIndex) {
             const task = tasks[taskIndex];
             let subtasks = parseSubtasks(task.subtasks);
             subtasks.splice(subIndex, 1);
-            
             task.subtasks = JSON.stringify(subtasks);
-            
             if (subtasks.length > 0) {
                 const doneCount = subtasks.filter(s => s.done).length;
                 task.progress = Math.round((doneCount / subtasks.length) * 100);
             }
-            
-            saveLocal();
-            renderTasks();
-            saveToServer(taskIndex);
+            saveLocal(); renderTasks(); saveToServer(taskIndex);
         }
 
         async function addTask() {
             const title = taskInput.value.trim();
             if (!title) return;
-            
-            // Создаем задачу с временным ID (на случай офлайна)
-            const newTask = { 
-                title: title, 
-                priority: priorityInput.value, 
-                progress: 0, 
-                created_at: new Date().toISOString(), 
-                subtasks: '[]',
-                tempId: Date.now() 
-            };
-            
+            const newTask = { title: title, priority: priorityInput.value, progress: 0, created_at: new Date().toISOString(), subtasks: '[]', tempId: Date.now() };
             tasks.unshift(newTask);
             taskInput.value = '';
-            saveLocal(); // Сразу сохраняем локально
-            renderTasks();
+            saveLocal(); renderTasks();
 
-            // Пытаемся отправить на сервер, если есть интернет
-            if (navigator.onLine) {
+            if (navigator.onLine && authToken) {
                 try {
-                    const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newTask) });
+                    const response = await fetch(`${API_BASE}/api/tasks`, { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` }, 
+                        body: JSON.stringify(newTask) 
+                    });
                     if (response.ok) {
                         const data = await response.json();
-                        newTask.id = data.id; // Присваиваем реальный ID
+                        newTask.id = data.id;
                         saveLocal();
                     }
-                } catch (e) { console.log("Задача сохранена только локально"); }
+                } catch (e) { console.log("Локально"); }
             }
         }
 
@@ -383,23 +417,17 @@
             if (isNaN(val)) val = 0;
             if (val < 0) val = 0; if (val > 100) val = 100;
             tasks[index].progress = val;
-            saveLocal();
-            renderTasks(); 
+            saveLocal(); renderTasks(); 
         }
 
         async function saveToServer(index) {
             const task = tasks[index];
-            if (!task.id || !navigator.onLine) return;
+            if (!task.id || !navigator.onLine || !authToken) return;
             try {
-                await fetch(`${API_URL}/${task.id}`, { 
+                await fetch(`${API_BASE}/api/tasks/${task.id}`, { 
                     method: 'PUT', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ 
-                        id: task.id, 
-                        progress: task.progress, 
-                        priority: task.priority,
-                        subtasks: task.subtasks
-                    }) 
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` }, 
+                    body: JSON.stringify({ id: task.id, progress: task.progress, priority: task.priority, subtasks: task.subtasks }) 
                 });
             } catch (e) { console.log("Офлайн"); }
         }
@@ -407,36 +435,28 @@
         function toggleComplete(index) {
             tasks[index].progress = tasks[index].progress === 100 ? 0 : 100;
             let subtasks = parseSubtasks(tasks[index].subtasks);
-            if (tasks[index].progress === 100) {
-                subtasks.forEach(s => s.done = true);
-            } else {
-                subtasks.forEach(s => s.done = false);
-            }
+            if (tasks[index].progress === 100) subtasks.forEach(s => s.done = true);
+            else subtasks.forEach(s => s.done = false);
             tasks[index].subtasks = JSON.stringify(subtasks);
-            
-            saveLocal();
-            renderTasks();
-            saveToServer(index);
+            saveLocal(); renderTasks(); saveToServer(index);
         }
 
         async function deleteTask(index) {
             if (!confirm('Удалить эту задачу?')) return;
             const task = tasks[index];
             tasks.splice(index, 1);
-            saveLocal();
-            renderTasks();
-            
-            if (task.id && navigator.onLine) {
-                try { await fetch(`${API_URL}/${task.id}`, { method: 'DELETE' }); } catch (e) { console.log("Офлайн"); }
+            saveLocal(); renderTasks();
+            if (task.id && navigator.onLine && authToken) {
+                try { await fetch(`${API_BASE}/api/tasks/${task.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authToken}` } }); } catch (e) {}
             }
         }
 
         addBtn.addEventListener('click', addTask);
         taskInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') addTask(); });
         
-        // Инициализация
+        // Запуск
         updateOnlineStatus();
-        loadTasks();
+        checkAuth();
     </script>
 </body>
 </html>
