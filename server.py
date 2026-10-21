@@ -39,6 +39,7 @@ def init_db():
             progress INTEGER DEFAULT 0,
             created_at TEXT,
             subtasks TEXT DEFAULT '[]',
+            repeat_type TEXT DEFAULT 'none',
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
     """)
@@ -70,12 +71,14 @@ class TaskCreate(BaseModel):
     progress: int
     created_at: str
     subtasks: str = '[]'
+    repeat_type: str = 'none'
 
 class TaskUpdate(BaseModel):
     id: int
     progress: int
     priority: str
     subtasks: str = '[]'
+    repeat_type: str = 'none'
 
 @app.post("/api/register")
 def register(user: UserCreate):
@@ -125,8 +128,8 @@ def create_task(task: TaskCreate, user_id: int = Depends(get_current_user)):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute(
-        "INSERT INTO tasks (user_id, title, priority, progress, created_at, subtasks) VALUES (?, ?, ?, ?, ?, ?)",
-        (user_id, task.title, task.priority, task.progress, task.created_at, task.subtasks)
+        "INSERT INTO tasks (user_id, title, priority, progress, created_at, subtasks, repeat_type) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (user_id, task.title, task.priority, task.progress, task.created_at, task.subtasks, task.repeat_type)
     )
     conn.commit()
     task_id = c.lastrowid
@@ -138,8 +141,8 @@ def update_task(task_id: int, task: TaskUpdate, user_id: int = Depends(get_curre
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute(
-        "UPDATE tasks SET progress = ?, priority = ?, subtasks = ? WHERE id = ? AND user_id = ?",
-        (task.progress, task.priority, task.subtasks, task_id, user_id)
+        "UPDATE tasks SET progress = ?, priority = ?, subtasks = ?, repeat_type = ? WHERE id = ? AND user_id = ?",
+        (task.progress, task.priority, task.subtasks, task.repeat_type, task_id, user_id)
     )
     conn.commit()
     conn.close()
