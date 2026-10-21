@@ -1,10 +1,9 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 import sqlite3
 from typing import List
-import uvicorn
 import hashlib
 import secrets
 
@@ -23,7 +22,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    # Таблица пользователей
     c.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,7 +30,6 @@ def init_db():
             token TEXT
         )
     """)
-    # Таблица задач (добавляем user_id)
     c.execute("""
         CREATE TABLE IF NOT EXISTS tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,11 +47,9 @@ def init_db():
 
 init_db()
 
-# Хэширование пароля (простое, для обучения)
 def hash_password(password: str):
     return hashlib.sha256(password.encode()).hexdigest()
 
-# Получение текущего пользователя по токену
 def get_current_user(token: str = Depends(oauth2_scheme)):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -63,9 +58,8 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     conn.close()
     if not user:
         raise HTTPException(status_code=401, detail="Неверный токен")
-    return user[0] # возвращаем user_id
+    return user[0]
 
-# --- МОДЕЛИ ДАННЫХ ---
 class UserCreate(BaseModel):
     email: str
     password: str
@@ -83,7 +77,6 @@ class TaskUpdate(BaseModel):
     priority: str
     subtasks: str = '[]'
 
-# --- АУТЕНТИФИКАЦИЯ ---
 @app.post("/api/register")
 def register(user: UserCreate):
     conn = sqlite3.connect(DB_PATH)
@@ -117,7 +110,6 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     
     return {"access_token": token, "token_type": "bearer"}
 
-# --- ЗАДАЧИ (ТЕПЕРЬ ЗАЩИЩЕНЫ) ---
 @app.get("/api/tasks", response_model=List[dict])
 def get_tasks(user_id: int = Depends(get_current_user)):
     conn = sqlite3.connect(DB_PATH)
@@ -161,6 +153,3 @@ def delete_task(task_id: int, user_id: int = Depends(get_current_user)):
     conn.commit()
     conn.close()
     return {"status": "ok"}
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
