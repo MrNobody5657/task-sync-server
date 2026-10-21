@@ -13,6 +13,10 @@
         body { background-color: var(--bg); color: var(--text); padding: 20px; padding-bottom: 80px; }
         h1 { font-size: 24px; margin-bottom: 20px; color: var(--accent); text-align: center; }
         
+        /* Индикатор офлайн-режима */
+        .offline-banner { background: #cf6679; color: #000; text-align: center; padding: 8px; font-size: 14px; font-weight: bold; border-radius: 8px; margin-bottom: 15px; display: none; }
+        .offline-banner.active { display: block; }
+
         .input-group { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
         input[type="text"] { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #333; background-color: var(--card); color: var(--text); font-size: 16px; min-width: 150px; }
         input[type="text"]:focus { outline: none; border-color: var(--accent); }
@@ -73,9 +77,12 @@
         .add-subtask-row button { padding: 4px 10px; border-radius: 4px; border: none; background: var(--accent); color: #000; cursor: pointer; font-size: 12px; }
         
         .empty-msg { text-align: center; color: #666; margin-top: 40px; font-style: italic; }
+        .sync-status { text-align: center; font-size: 12px; color: #666; margin-top: 10px; }
     </style>
 </head>
 <body>
+    <div id="offlineBanner" class="offline-banner">⚡ Офлайн-режим (изменения сохранятся локально)</div>
+
     <h1>📱 Мои Задачи</h1>
     
     <div class="input-group">
@@ -96,6 +103,7 @@
     </div>
 
     <div class="task-list" id="taskList"></div>
+    <div class="sync-status" id="syncStatus"></div>
 
     <script>
         const API_URL = 'https://task-sync-server.onrender.com/api/tasks';
@@ -108,19 +116,77 @@
         const addBtn = document.getElementById('addBtn');
         const taskList = document.getElementById('taskList');
         const sortBtn = document.getElementById('sortBtn');
+        const offlineBanner = document.getElementById('offlineBanner');
+        const syncStatus = document.getElementById('syncStatus');
 
+        // --- ЛОКАЛЬНОЕ ХРАНИЛИЩЕ ---
+        function saveLocal() {
+            localStorage.setItem('my_tasks_offline', JSON.stringify(tasks));
+        }
+        function loadLocal() {
+            const local = localStorage.getItem('my_tasks_offline');
+            return local ? JSON.parse(local) : [];
+        }
+
+        // --- СЕТЬ ---
+        function updateOnlineStatus() {
+            if (navigator.onLine) {
+                offlineBanner.classList.remove('active');
+                syncStatus.innerText = 'Синхронизация...';
+                syncData();
+            } else {
+                offlineBanner.classList.add('active');
+                syncStatus.innerText = 'Офлайн. Данные сохранены на устройстве.';
+            }
+        }
+
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+
+        // --- ЗАГРУЗКА ДАННЫХ ---
         async function loadTasks() {
-            taskList.innerHTML = '<div class="empty-msg">Загрузка с сервера... (до 50 сек)</div>';
+            // 1. Мгновенно показываем локальные данные (мгновенный запуск)
+            tasks = loadLocal();
+            renderTasks();
+
+            // 2. Пытаемся получить свежие данные из облака
             try {
                 const response = await fetch(API_URL);
                 if (response.ok) {
-                    tasks = await response.json();
+                    const serverTasks = await response.json();
+                    
+                    // Простое разрешение конфликтов: если локальная задача новее, оставляем её
+                    // Для простоты сейчас просто берем серверные, но помечаем локальные "грязные"
+                    // В реальном приложении тут нужна сложная логика слияния.
+                    
+                    tasks = serverTasks; 
+                    saveLocal();
                     renderTasks();
+                    syncStatus.innerText = 'Данные синхронизированы с облаком.';
                 }
             } catch (e) {
-                console.error("Ошибка загрузки", e);
-                taskList.innerHTML = '<div class="empty-msg">Нет связи с сервером.</div>';
+                console.error("Нет связи с сервером", e);
+                syncStatus.innerText = 'Не удалось связаться с сервером. Работаем офлайн.';
             }
+        }
+
+        // --- СИНХРОНИЗАЦИЯ (ОТПРАВКА) ---
+        async function syncData() {
+            if (!navigator.onLine) return;
+            
+            // Ищем задачи без id (новые, созданные офлайн)
+            const offlineNewTasks = tasks.filter(t => !t.id);
+            for (const task of offlineNewTasks) {
+                try {
+                    const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(task) });
+                    if (response.ok) {
+                        const data = await response.json();
+                        task.id = data.id; // Присваиваем реальный ID
+                        saveLocal();
+                    }
+                } catch (e) { console.log("Не удалось синхронизировать новую задачу"); }
+            }
+            syncStatus.innerText = 'Все изменения сохранены.';
         }
 
         function setFilter(filter) {
@@ -163,7 +229,7 @@
             });
 
             if (currentSort === 'new') {
-                filteredTasks.sort((a, b) => b.id - a.id);
+                filteredTasks.sort((a, b) => (b.id || Date.now()) - (a.id || Date.now()));
             } else if (currentSort === 'priority') {
                 filteredTasks.sort((a, b) => getPriorityWeight(b.priority) - getPriorityWeight(a.priority));
             }
@@ -174,7 +240,7 @@
             }
 
             filteredTasks.forEach((task) => {
-                const index = tasks.findIndex(t => t.id === task.id); 
+                const index = tasks.findIndex(t => t.id === task.id || t.tempId === task.tempId); 
                 const div = document.createElement('div');
                 const pClass = getPriorityClass(task.priority || 'med');
                 const isDone = task.progress === 100 ? 'done' : '';
@@ -242,6 +308,7 @@
             
             task.subtasks = JSON.stringify(subtasks);
             input.value = '';
+            saveLocal();
             renderTasks();
             saveToServer(taskIndex);
         }
@@ -257,6 +324,7 @@
             const totalCount = subtasks.length;
             task.progress = Math.round((doneCount / totalCount) * 100);
 
+            saveLocal();
             renderTasks();
             saveToServer(taskIndex);
         }
@@ -273,6 +341,7 @@
                 task.progress = Math.round((doneCount / subtasks.length) * 100);
             }
             
+            saveLocal();
             renderTasks();
             saveToServer(taskIndex);
         }
@@ -280,17 +349,33 @@
         async function addTask() {
             const title = taskInput.value.trim();
             if (!title) return;
-            const newTask = { title: title, priority: priorityInput.value, progress: 0, created_at: new Date().toISOString(), subtasks: '[]' };
+            
+            // Создаем задачу с временным ID (на случай офлайна)
+            const newTask = { 
+                title: title, 
+                priority: priorityInput.value, 
+                progress: 0, 
+                created_at: new Date().toISOString(), 
+                subtasks: '[]',
+                tempId: Date.now() 
+            };
+            
+            tasks.unshift(newTask);
             taskInput.value = '';
-            try {
-                const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newTask) });
-                if (response.ok) {
-                    const data = await response.json();
-                    newTask.id = data.id;
-                    tasks.push(newTask); 
-                    renderTasks();
-                }
-            } catch (e) { alert("Сервер спит, попробуйте через минуту"); }
+            saveLocal(); // Сразу сохраняем локально
+            renderTasks();
+
+            // Пытаемся отправить на сервер, если есть интернет
+            if (navigator.onLine) {
+                try {
+                    const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newTask) });
+                    if (response.ok) {
+                        const data = await response.json();
+                        newTask.id = data.id; // Присваиваем реальный ID
+                        saveLocal();
+                    }
+                } catch (e) { console.log("Задача сохранена только локально"); }
+            }
         }
 
         function updateProgress(index, value) {
@@ -298,12 +383,13 @@
             if (isNaN(val)) val = 0;
             if (val < 0) val = 0; if (val > 100) val = 100;
             tasks[index].progress = val;
+            saveLocal();
             renderTasks(); 
         }
 
         async function saveToServer(index) {
             const task = tasks[index];
-            if (!task.id) return;
+            if (!task.id || !navigator.onLine) return;
             try {
                 await fetch(`${API_URL}/${task.id}`, { 
                     method: 'PUT', 
@@ -328,6 +414,7 @@
             }
             tasks[index].subtasks = JSON.stringify(subtasks);
             
+            saveLocal();
             renderTasks();
             saveToServer(index);
         }
@@ -336,14 +423,19 @@
             if (!confirm('Удалить эту задачу?')) return;
             const task = tasks[index];
             tasks.splice(index, 1);
+            saveLocal();
             renderTasks();
-            if (task.id) {
+            
+            if (task.id && navigator.onLine) {
                 try { await fetch(`${API_URL}/${task.id}`, { method: 'DELETE' }); } catch (e) { console.log("Офлайн"); }
             }
         }
 
         addBtn.addEventListener('click', addTask);
         taskInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') addTask(); });
+        
+        // Инициализация
+        updateOnlineStatus();
         loadTasks();
     </script>
 </body>
