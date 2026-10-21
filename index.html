@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Мои Задачи</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#121212">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <style>
+        :root { --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --accent: #bb86fc; --success: #03dac6; --priority-high: #ff5252; --priority-med: #ffd740; --priority-low: #69f0ae; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); padding: 20px; padding-bottom: 80px; }
+        h1 { font-size: 24px; margin-bottom: 20px; color: var(--accent); text-align: center; }
+        .input-group { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        input[type="text"] { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #333; background-color: var(--card); color: var(--text); font-size: 16px; min-width: 150px; }
+        input[type="text"]:focus { outline: none; border-color: var(--accent); }
+        select { padding: 12px; border-radius: 8px; border: 1px solid #333; background-color: var(--card); color: var(--text); font-size: 14px; cursor: pointer; }
+        select:focus { outline: none; border-color: var(--accent); }
+        button.add-btn { padding: 12px 20px; border: none; border-radius: 8px; background-color: var(--accent); color: #000; font-weight: bold; font-size: 16px; cursor: pointer; flex-basis: 100%; }
+        button.add-btn:active { opacity: 0.7; }
+        .task-list { display: flex; flex-direction: column; gap: 10px; }
+        .task-item { background-color: var(--card); padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 12px; border-left: 4px solid #333; transition: all 0.3s ease; position: relative; }
+        .task-item.p-high { border-left-color: var(--priority-high); }
+        .task-item.p-med { border-left-color: var(--priority-med); }
+        .task-item.p-low { border-left-color: var(--priority-low); }
+        .task-item.done { opacity: 0.5; }
+        .task-item.done .task-title { text-decoration: line-through; }
+        .task-item.done .priority-badge { opacity: 0.5; }
+        .task-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+        .task-title-wrapper { flex: 1; }
+        .title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .task-title { font-size: 16px; word-break: break-word; }
+        .priority-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; text-transform: uppercase; }
+        .p-high .priority-badge { background: rgba(255, 82, 82, 0.2); color: var(--priority-high); }
+        .p-med .priority-badge { background: rgba(255, 215, 64, 0.2); color: var(--priority-med); }
+        .p-low .priority-badge { background: rgba(105, 240, 174, 0.2); color: var(--priority-low); }
+        .task-date { font-size: 11px; color: #888; display: block; margin-top: 6px; }
+        .task-actions { display: flex; gap: 5px; align-items: center; }
+        .check-btn { background: none; border: 2px solid #444; border-radius: 50%; width: 28px; height: 28px; display: flex; justify-content: center; align-items: center; cursor: pointer; font-size: 16px; color: transparent; transition: all 0.2s; }
+        .check-btn:active { transform: scale(0.9); }
+        .check-btn.done { background-color: var(--success); border-color: var(--success); color: #000; }
+        .delete-btn { background: none; border: none; font-size: 20px; cursor: pointer; padding: 5px; border-radius: 5px; }
+        .delete-btn:active { background-color: #333; }
+        .progress-controls { display: flex; align-items: center; gap: 10px; background: #252525; padding: 8px 12px; border-radius: 8px; }
+        input[type="range"] { flex: 1; -webkit-appearance: none; background: transparent; height: 6px; }
+        input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #333; border-radius: 3px; }
+        input[type="range"]::-webkit-slider-thumb { height: 16px; width: 16px; border-radius: 50%; background: var(--accent); cursor: pointer; -webkit-appearance: none; margin-top: -5px; }
+        .task-item.done input[type="range"]::-webkit-slider-thumb { background: var(--success); }
+        input[type="number"] { width: 50px; padding: 4px; border-radius: 4px; border: 1px solid #444; background: var(--bg); color: var(--text); text-align: center; font-size: 14px; }
+        input[type="number"]:focus { outline: none; border-color: var(--accent); }
+        .percent-sign { font-size: 14px; color: #888; }
+        .empty-msg { text-align: center; color: #666; margin-top: 40px; font-style: italic; }
+    </style>
+</head>
+<body>
+    <h1>📱 Мои Задачи</h1>
+    <div class="input-group">
+        <input type="text" id="taskInput" placeholder="Что нужно сделать?" autocomplete="off">
+        <select id="priorityInput">
+            <option value="low">Низкий</option>
+            <option value="med" selected>Средний</option>
+            <option value="high">Высокий</option>
+        </select>
+        <button class="add-btn" id="addBtn">+ Добавить</button>
+    </div>
+    <div class="task-list" id="taskList"></div>
+
+    <script>
+        // Адрес твоего облачного сервера на Render
+        const API_URL = 'https://task-sync-server.onrender.com/api/tasks';
+        let tasks = [];
+        
+        const taskInput = document.getElementById('taskInput');
+        const priorityInput = document.getElementById('priorityInput');
+        const addBtn = document.getElementById('addBtn');
+        const taskList = document.getElementById('taskList');
+
+        // Загрузка задач с сервера
+        async function loadTasks() {
+            taskList.innerHTML = '<div class="empty-msg">Загрузка с сервера... (до 50 сек)</div>';
+            try {
+                const response = await fetch(API_URL);
+                if (response.ok) {
+                    const serverTasks = await response.json();
+                    tasks = serverTasks.sort((a, b) => b.id - a.id);
+                    renderTasks();
+                }
+            } catch (e) {
+                console.error("Ошибка загрузки", e);
+                taskList.innerHTML = '<div class="empty-msg">Нет связи с сервером. Попробуйте позже.</div>';
+            }
+        }
+
+        function formatDate(isoString) {
+            if (!isoString) return '';
+            const date = new Date(isoString);
+            const now = new Date();
+            const isToday = date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+            const time = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+            return isToday ? `Сегодня, ${time}` : `${date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}, ${time}`;
+        }
+
+        function getPriorityClass(p) { return p === 'high' ? 'p-high' : p === 'low' ? 'p-low' : 'p-med'; }
+        function getPriorityName(p) { return p === 'high' ? 'Высокий' : p === 'low' ? 'Низкий' : 'Средний'; }
+
+        function renderTasks() {
+            taskList.innerHTML = '';
+            if (tasks.length === 0) {
+                taskList.innerHTML = '<div class="empty-msg">Пока задач нет. Добавь первую!</div>';
+                return;
+            }
+            tasks.forEach((task, index) => {
+                const div = document.createElement('div');
+                const pClass = getPriorityClass(task.priority || 'med');
+                const isDone = task.progress === 100 ? 'done' : '';
+                div.className = `task-item ${pClass} ${isDone}`;
+                const dateStr = formatDate(task.created_at);
+                const dateHtml = dateStr ? `<span class="task-date">${dateStr}</span>` : '';
+                div.innerHTML = `
+                    <div class="task-header">
+                        <div class="task-title-wrapper">
+                            <div class="title-row">
+                                <span class="task-title">${task.title}</span>
+                                <span class="priority-badge">${getPriorityName(task.priority || 'med')}</span>
+                            </div>
+                            ${dateHtml}
+                        </div>
+                        <div class="task-actions">
+                            <button class="check-btn ${isDone ? 'done' : ''}" onclick="toggleComplete(${index})">✓</button>
+                            <button class="delete-btn" onclick="deleteTask(${index})">🗑️</button>
+                        </div>
+                    </div>
+                    <div class="progress-controls">
+                        <input type="range" min="0" max="100" value="${task.progress}" oninput="updateProgress(${index}, this.value)" onchange="saveToServer(${index})">
+                        <input type="number" min="0" max="100" value="${task.progress}" onchange="updateProgress(${index}, this.value); saveToServer(${index})">
+                        <span class="percent-sign">%</span>
+                    </div>
+                `;
+                taskList.appendChild(div);
+            });
+        }
+
+        async function addTask() {
+            const title = taskInput.value.trim();
+            if (!title) return;
+            const newTask = { title: title, priority: priorityInput.value, progress: 0, created_at: new Date().toISOString() };
+            taskInput.value = '';
+            try {
+                const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newTask) });
+                if (response.ok) {
+                    const data = await response.json();
+                    newTask.id = data.id;
+                    tasks.unshift(newTask);
+                    renderTasks();
+                } else { alert("Ошибка сохранения"); }
+            } catch (e) { alert("Сервер спит, попробуйте через минуту"); }
+        }
+
+        function updateProgress(index, value) {
+            let val = parseInt(value);
+            if (isNaN(val)) val = 0;
+            if (val < 0) val = 0; if (val > 100) val = 100;
+            tasks[index].progress = val;
+            const taskDiv = taskList.children[index];
+            const checkBtn = taskDiv.querySelector('.check-btn');
+            if (val === 100) { taskDiv.classList.add('done'); checkBtn.classList.add('done'); }
+            else { taskDiv.classList.remove('done'); checkBtn.classList.remove('done'); }
+            const rangeInput = taskDiv.querySelector('input[type="range"]');
+            const numberInput = taskDiv.querySelector('input[type="number"]');
+            if (rangeInput.value != val) rangeInput.value = val;
+            if (numberInput.value != val) numberInput.value = val;
+        }
+
+        async function saveToServer(index) {
+            const task = tasks[index];
+            if (!task.id) return;
+            try {
+                await fetch(`${API_URL}/${task.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, progress: task.progress, priority: task.priority }) });
+            } catch (e) { console.log("Офлайн"); }
+        }
+
+        function toggleComplete(index) {
+            tasks[index].progress = tasks[index].progress === 100 ? 0 : 100;
+            renderTasks();
+            saveToServer(index);
+        }
+
+        async function deleteTask(index) {
+            if (!confirm('Удалить эту задачу?')) return;
+            const task = tasks[index];
+            tasks.splice(index, 1);
+            renderTasks();
+            if (task.id) {
+                try { await fetch(`${API_URL}/${task.id}`, { method: 'DELETE' }); } catch (e) { console.log("Офлайн"); }
+            }
+        }
+
+        addBtn.addEventListener('click', addTask);
+        taskInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') addTask(); });
+        loadTasks();
+    </script>
+</body>
+</html>
