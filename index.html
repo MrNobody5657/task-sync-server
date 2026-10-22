@@ -476,7 +476,8 @@
                 progress: 0, 
                 created_at: new Date().toISOString(), 
                 subtasks: '[]',
-                tempId: Date.now() 
+                tempId: Date.now(),
+                is_owner: true
             };
             tasks.unshift(newTask);
             taskInput.value = '';
