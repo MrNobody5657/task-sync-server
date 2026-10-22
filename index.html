@@ -26,11 +26,12 @@
 
         .input-group { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
         input[type="text"] { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #333; background-color: var(--card); color: var(--text); font-size: 16px; min-width: 150px; }
-        input[type="text"]:focus { outline: none; border-color: var(--accent); }
         select { padding: 12px; border-radius: 8px; border: 1px solid #333; background-color: var(--card); color: var(--text); font-size: 14px; cursor: pointer; }
-        select:focus { outline: none; border-color: var(--accent); }
+        
+        #customIntervalInput { display: none; width: 80px; padding: 12px; border-radius: 8px; border: 1px solid #333; background-color: var(--card); color: var(--text); font-size: 16px; }
+        #customIntervalInput.visible { display: block; }
+
         button.add-btn { padding: 12px 20px; border: none; border-radius: 8px; background-color: var(--accent); color: #000; font-weight: bold; font-size: 16px; cursor: pointer; flex-basis: 100%; }
-        button.add-btn:active { opacity: 0.7; }
 
         .controls { display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px; }
         .filter-btn { padding: 8px 16px; border-radius: 20px; border: 1px solid #444; background: transparent; color: var(--text); font-size: 14px; cursor: pointer; white-space: nowrap; }
@@ -55,7 +56,6 @@
         
         .repeat-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #333; color: #ccc; }
         
-        .task-date { font-size: 11px; color: #888; display: block; margin-top: 6px; }
         .task-actions { display: flex; gap: 5px; align-items: center; }
         .check-btn { background: none; border: 2px solid #444; border-radius: 50%; width: 28px; height: 28px; display: flex; justify-content: center; align-items: center; cursor: pointer; font-size: 16px; color: transparent; transition: all 0.2s; }
         .check-btn.done { background-color: var(--success); border-color: var(--success); color: #000; }
@@ -65,25 +65,16 @@
         input[type="range"] { flex: 1; -webkit-appearance: none; background: transparent; height: 6px; }
         input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #333; border-radius: 3px; }
         input[type="range"]::-webkit-slider-thumb { height: 16px; width: 16px; border-radius: 50%; background: var(--accent); cursor: pointer; -webkit-appearance: none; margin-top: -5px; }
-        input[type="number"] { width: 50px; padding: 4px; border-radius: 4px; border: 1px solid #444; background: var(--bg); color: var(--text); text-align: center; font-size: 14px; }
         .percent-sign { font-size: 14px; color: #888; }
 
-        .subtasks-container { border-top: 1px dashed #333; padding-top: 10px; margin-top: 5px; }
-        .subtask-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
-        .subtask-item input[type="checkbox"] { appearance: none; width: 18px; height: 18px; border: 2px solid #555; border-radius: 4px; cursor: pointer; position: relative; }
-        .subtask-item input[type="checkbox"]:checked { background-color: var(--accent); border-color: var(--accent); }
-        .subtask-item input[type="checkbox"]:checked::after { content: '✔'; position: absolute; top: -2px; left: 2px; color: #000; font-size: 14px; font-weight: bold; }
-        .subtask-text { font-size: 14px; color: #ccc; flex: 1; }
-        .subtask-item.done .subtask-text { text-decoration: line-through; color: #666; }
-        .subtask-delete { background: none; border: none; color: #666; cursor: pointer; font-size: 14px; }
-        .add-subtask-row { display: flex; gap: 5px; margin-top: 5px; }
-        .add-subtask-row input { flex: 1; padding: 6px; font-size: 12px; border-radius: 4px; border: 1px solid #444; background: #121212; color: #fff; }
-        .add-subtask-row button { padding: 4px 10px; border-radius: 4px; border: none; background: var(--accent); color: #000; cursor: pointer; font-size: 12px; }
-        
         .empty-msg { text-align: center; color: #666; margin-top: 40px; font-style: italic; }
         .logout-btn { position: absolute; top: 20px; right: 20px; background: none; border: none; color: #cf6679; cursor: pointer; font-size: 14px; }
+        
+        /* Индикатор загрузки */
+        .loading { text-align: center; color: #888; margin-top: 20px; font-style: italic; }
     </style>
 </head><body>
+    <!-- ЭКРАН ВХОДА -->
     <div id="authScreen" class="screen active">
         <div class="auth-container">
             <h1>📱 Мои Задачи</h1>
@@ -95,6 +86,7 @@
         </div>
     </div>
 
+    <!-- ГЛАВНЫЙ ЭКРАН -->
     <div id="mainScreen" class="screen">
         <button class="logout-btn" id="logoutBtn">Выйти</button>
         <div id="offlineBanner" class="offline-banner">⚡ Офлайн-режим</div>
@@ -107,11 +99,13 @@
                 <option value="med" selected>Средний</option>
                 <option value="high">Высокий</option>
             </select>
-            <select id="repeatInput">
+            <select id="repeatInput" onchange="toggleCustomInterval()">
                 <option value="none" selected>Не повторять</option>
                 <option value="daily">Каждый день</option>
                 <option value="weekly">Каждую неделю</option>
+                <option value="custom">Свой интервал...</option>
             </select>
+            <input type="number" id="customIntervalInput" min="1" placeholder="Дней">
             <button class="add-btn" id="addBtn">+ Добавить</button>
         </div>
 
@@ -133,13 +127,20 @@
         const taskInput = document.getElementById('taskInput');
         const priorityInput = document.getElementById('priorityInput');
         const repeatInput = document.getElementById('repeatInput');
+        const customIntervalInput = document.getElementById('customIntervalInput');
         const addBtn = document.getElementById('addBtn');
         const taskList = document.getElementById('taskList');
         const offlineBanner = document.getElementById('offlineBanner');
         const authError = document.getElementById('authError');
 
+        function toggleCustomInterval() {
+            if (repeatInput.value === 'custom') customIntervalInput.classList.add('visible');
+            else customIntervalInput.classList.remove('visible');
+        }
+
+        // 1. Проверка авторизации при запуске
         function checkAuth() {
-            if (authToken) {
+            if (authToken && authToken !== 'undefined') {
                 authScreen.classList.remove('active');
                 mainScreen.classList.add('active');
                 loadTasks();
@@ -149,55 +150,90 @@
             }
         }
 
+        // 2. Логин
         document.getElementById('loginBtn').addEventListener('click', async () => {
             const email = document.getElementById('authEmail').value;
             const password = document.getElementById('authPassword').value;
+            authError.innerText = '';
+            
             const formData = new URLSearchParams();
             formData.append('username', email);
             formData.append('password', password);
+
             try {
                 const res = await fetch(`${API_BASE}/api/login`, { method: 'POST', body: formData });
                 if (res.ok) {
                     const data = await res.json();
                     authToken = data.access_token;
-                    localStorage.setItem('auth_token', authToken);
+                    localStorage.setItem('auth_token', authToken); // Сохраняем
                     checkAuth();
-                } else { authError.innerText = 'Неверный email или пароль'; }
-            } catch (e) { authError.innerText = 'Сервер спит. Подождите.'; }
+                } else {
+                    authError.innerText = 'Неверный email или пароль';
+                }
+            } catch (e) {
+                authError.innerText = 'Ошибка сети. Сервер спит?';
+            }
         });
 
+        // 3. Регистрация
         document.getElementById('registerBtn').addEventListener('click', async () => {
             const email = document.getElementById('authEmail').value;
             const password = document.getElementById('authPassword').value;
+            authError.innerText = '';
+            
             try {
                 const res = await fetch(`${API_BASE}/api/register`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password })
                 });
-                if (res.ok) alert('Успешно! Теперь войдите.');
-                else { const d = await res.json(); authError.innerText = d.detail; }
-            } catch (e) { authError.innerText = 'Сервер спит.'; }
+                if (res.ok) {
+                    alert('Регистрация успешна! Теперь войдите.');
+                } else {
+                    const data = await res.json();
+                    authError.innerText = data.detail || 'Ошибка регистрации';
+                }
+            } catch (e) {
+                authError.innerText = 'Ошибка сети. Сервер спит?';
+            }
         });
 
+        // 4. Выход
         document.getElementById('logoutBtn').addEventListener('click', () => {
-            authToken = null; localStorage.removeItem('auth_token'); checkAuth();
+            authToken = null;
+            localStorage.removeItem('auth_token');
+            checkAuth();
         });
 
+        // --- РАБОТА С ДАННЫМИ ---
         function saveLocal() { localStorage.setItem('my_tasks_offline', JSON.stringify(tasks)); }
         function loadLocal() { const local = localStorage.getItem('my_tasks_offline'); return local ? JSON.parse(local) : []; }
 
         async function loadTasks() {
-            tasks = loadLocal(); renderTasks();
+            tasks = loadLocal(); 
+            renderTasks();
+
             if (!authToken || !navigator.onLine) return;
+
+            // Показываем, что идет загрузка
+            if (taskList.innerHTML === '' || taskList.innerHTML.includes('Пусто')) {
+                taskList.innerHTML = '<div class="loading">Загрузка с сервера...</div>';
+            }
+
             try {
                 const response = await fetch(`${API_BASE}/api/tasks`, { headers: { 'Authorization': `Bearer ${authToken}` } });
                 if (response.ok) {
                     tasks = await response.json();
                     saveLocal(); renderTasks();
                 } else if (response.status === 401) {
-                    localStorage.removeItem('auth_token'); location.reload();
+                    // Токен протух (только в этом случае разлогиниваем)
+                    localStorage.removeItem('auth_token'); 
+                    authToken = null;
+                    checkAuth();
                 }
-            } catch (e) { console.log("Офлайн"); }
+            } catch (e) { 
+                console.log("Нет связи с сервером, работаем офлайн.");
+                // Не удаляем токен при ошибке сети!
+            }
         }
 
         function setFilter(filter) {
@@ -205,6 +241,14 @@
             document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
             renderTasks();
+        }
+
+        function getRepeatText(type) {
+            if (!type || type === 'none') return '';
+            if (type === 'daily') return 'Каждый день';
+            if (type === 'weekly') return 'Каждую неделю';
+            if (!isNaN(parseInt(type))) return `Каждые ${type} дн.`;
+            return 'Повтор';
         }
 
         function renderTasks() {
@@ -226,9 +270,8 @@
                 const isDone = task.progress === 100 ? 'done' : '';
                 div.className = `task-item p-${task.priority} ${isDone}`;
                 
-                let repeatHtml = '';
-                if (task.repeat_type === 'daily') repeatHtml = '<span class="repeat-badge">Каждый день</span>';
-                if (task.repeat_type === 'weekly') repeatHtml = '<span class="repeat-badge">Каждую неделю</span>';
+                const repeatText = getRepeatText(task.repeat_type);
+                let repeatHtml = repeatText ? `<span class="repeat-badge">${repeatText}</span>` : '';
 
                 div.innerHTML = `
                     <div class="task-header">
@@ -256,10 +299,18 @@
         async function addTask() {
             const title = taskInput.value.trim();
             if (!title) return;
+            
+            let repeatType = repeatInput.value;
+            if (repeatType === 'custom') {
+                const days = parseInt(customIntervalInput.value);
+                if (days > 0) repeatType = days.toString();
+                else repeatType = 'none';
+            }
+
             const newTask = { 
                 title: title, 
                 priority: priorityInput.value, 
-                repeat_type: repeatInput.value,
+                repeat_type: repeatType,
                 progress: 0, 
                 created_at: new Date().toISOString(), 
                 subtasks: '[]',
@@ -267,6 +318,7 @@
             };
             tasks.unshift(newTask);
             taskInput.value = '';
+            customIntervalInput.value = '';
             saveLocal(); renderTasks();
 
             if (navigator.onLine && authToken) {
@@ -276,7 +328,7 @@
                         body: JSON.stringify(newTask) 
                     });
                     if (response.ok) { const data = await response.json(); newTask.id = data.id; saveLocal(); }
-                } catch (e) { console.log("Локально"); }
+                } catch (e) { console.log("Сохранено локально"); }
             }
         }
 
@@ -325,6 +377,7 @@
         addBtn.addEventListener('click', addTask);
         taskInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') addTask(); });
         
+        // Запуск
         checkAuth();
     </script>
 </body>
