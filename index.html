@@ -19,12 +19,10 @@
         .auth-container { max-width: 400px; margin: 50px auto; text-align: center; }
         .auth-container input { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #333; background: var(--card); color: var(--text); font-size: 16px; }
         .auth-container button { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--accent); color: #000; font-weight: bold; font-size: 16px; cursor: pointer; margin-bottom: 10px; }
-        .auth-container button:active { opacity: 0.7; }
 
         .offline-banner { background: #cf6679; color: #000; text-align: center; padding: 8px; font-size: 14px; font-weight: bold; border-radius: 8px; margin-bottom: 15px; display: none; }
         .offline-banner.active { display: block; }
 
-        /* Стили для поиска */
         .search-bar { margin-bottom: 15px; }
         #searchInput { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #333; background-color: var(--card); color: var(--text); font-size: 16px; }
         #searchInput:focus { outline: none; border-color: var(--accent); }
@@ -35,6 +33,10 @@
         
         #customIntervalInput { display: none; width: 80px; padding: 12px; border-radius: 8px; border: 1px solid #333; background-color: var(--card); color: var(--text); font-size: 16px; }
         #customIntervalInput.visible { display: block; }
+
+        /* Поле даты */
+        #dueDateInput { padding: 12px; border-radius: 8px; border: 1px solid #333; background-color: var(--card); color: var(--text); font-size: 14px; width: 100%; }
+        #dueDateInput:focus { outline: none; border-color: var(--accent); }
 
         button.add-btn { padding: 12px 20px; border: none; border-radius: 8px; background-color: var(--accent); color: #000; font-weight: bold; font-size: 16px; cursor: pointer; flex-basis: 100%; }
 
@@ -111,6 +113,9 @@
                 <option value="custom">Свой интервал...</option>
             </select>
             <input type="number" id="customIntervalInput" min="1" placeholder="Дней">
+            
+            <input type="date" id="dueDateInput">
+            
             <button class="add-btn" id="addBtn">+ Добавить</button>
         </div>
 
@@ -138,6 +143,7 @@
         const offlineBanner = document.getElementById('offlineBanner');
         const authError = document.getElementById('authError');
         const searchInput = document.getElementById('searchInput');
+        const dueDateInput = document.getElementById('dueDateInput');
 
         function toggleCustomInterval() {
             if (repeatInput.value === 'custom') customIntervalInput.classList.add('visible');
@@ -159,11 +165,9 @@
             const email = document.getElementById('authEmail').value;
             const password = document.getElementById('authPassword').value;
             authError.innerText = '';
-            
             const formData = new URLSearchParams();
             formData.append('username', email);
             formData.append('password', password);
-
             try {
                 const res = await fetch(`${API_BASE}/api/login`, { method: 'POST', body: formData });
                 if (res.ok) {
@@ -171,33 +175,22 @@
                     authToken = data.access_token;
                     localStorage.setItem('auth_token', authToken);
                     checkAuth();
-                } else {
-                    authError.innerText = 'Неверный email или пароль';
-                }
-            } catch (e) {
-                authError.innerText = 'Ошибка сети. Сервер спит?';
-            }
+                } else { authError.innerText = 'Неверный email или пароль'; }
+            } catch (e) { authError.innerText = 'Ошибка сети. Сервер спит?'; }
         });
 
         document.getElementById('registerBtn').addEventListener('click', async () => {
             const email = document.getElementById('authEmail').value;
             const password = document.getElementById('authPassword').value;
             authError.innerText = '';
-            
             try {
                 const res = await fetch(`${API_BASE}/api/register`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password })
                 });
-                if (res.ok) {
-                    alert('Регистрация успешна! Теперь войдите.');
-                } else {
-                    const data = await res.json();
-                    authError.innerText = data.detail || 'Ошибка регистрации';
-                }
-            } catch (e) {
-                authError.innerText = 'Ошибка сети. Сервер спит?';
-            }
+                if (res.ok) { alert('Регистрация успешна! Теперь войдите.'); }
+                else { const data = await res.json(); authError.innerText = data.detail || 'Ошибка'; }
+            } catch (e) { authError.innerText = 'Ошибка сети. Сервер спит?'; }
         });
 
         document.getElementById('logoutBtn').addEventListener('click', () => {
@@ -212,26 +205,19 @@
         async function loadTasks() {
             tasks = loadLocal(); 
             renderTasks();
-
             if (!authToken || !navigator.onLine) return;
-
             if (taskList.innerHTML === '' || taskList.innerHTML.includes('Пусто')) {
                 taskList.innerHTML = '<div class="loading">Загрузка с сервера...</div>';
             }
-
             try {
                 const response = await fetch(`${API_BASE}/api/tasks`, { headers: { 'Authorization': `Bearer ${authToken}` } });
                 if (response.ok) {
                     tasks = await response.json();
                     saveLocal(); renderTasks();
                 } else if (response.status === 401) {
-                    localStorage.removeItem('auth_token'); 
-                    authToken = null;
-                    checkAuth();
+                    localStorage.removeItem('auth_token'); authToken = null; checkAuth();
                 }
-            } catch (e) { 
-                console.log("Нет связи с сервером, работаем офлайн.");
-            }
+            } catch (e) { console.log("Офлайн"); }
         }
 
         function setFilter(filter) {
@@ -249,20 +235,27 @@
             return 'Повтор';
         }
 
+        function getDueBadge(task) {
+            if (!task.due_date) return '';
+            const today = new Date().toISOString().split('T')[0];
+            
+            if (task.due_date < today && task.progress < 100) {
+                return '<span class="repeat-badge" style="background:#ff5252; color:#fff;">Просрочено</span>';
+            } else if (task.due_date === today && task.progress < 100) {
+                return '<span class="repeat-badge" style="background:#ffd740; color:#000;">Сегодня</span>';
+            } else {
+                return `<span class="repeat-badge" style="background:#333;">До ${task.due_date}</span>`;
+            }
+        }
+
         function renderTasks() {
             taskList.innerHTML = '';
-            
-            // Получаем текст из поиска (в нижнем регистре для удобства)
             const searchText = searchInput.value.toLowerCase();
 
             let filteredTasks = tasks.filter(task => {
-                // 1. Фильтр по вкладкам (Все / Активные / Архив)
                 if (currentFilter === 'active' && task.progress >= 100) return false;
                 if (currentFilter === 'done' && task.progress < 100) return false;
-                
-                // 2. Фильтр по поиску
                 if (searchText && !task.title.toLowerCase().includes(searchText)) return false;
-                
                 return true;
             });
 
@@ -279,6 +272,9 @@
                 
                 const repeatText = getRepeatText(task.repeat_type);
                 let repeatHtml = repeatText ? `<span class="repeat-badge">${repeatText}</span>` : '';
+                
+                // Бейдж дедлайна
+                const dueHtml = getDueBadge(task);
 
                 div.innerHTML = `
                     <div class="task-header">
@@ -287,6 +283,7 @@
                                 <span class="task-title">${task.title}</span>
                                 <span class="priority-badge">${task.priority}</span>
                                 ${repeatHtml}
+                                ${dueHtml}
                             </div>
                         </div>
                         <div class="task-actions">
@@ -296,11 +293,9 @@
                     </div>
                     <div class="progress-controls">
                         <input type="range" min="0" max="100" value="${task.progress}" oninput="updateProgress(${index}, this.value)" onchange="saveToServer(${index})">
-                        
                         <input type="number" min="0" max="100" value="${task.progress}" 
                                onchange="updateProgress(${index}, this.value); saveToServer(${index})" 
                                style="width: 60px; background: var(--bg); color: var(--text); border: 1px solid #444; border-radius: 4px; padding: 4px; text-align: center;">
-                        
                         <span class="percent-sign">%</span>
                     </div>
                 `;
@@ -323,6 +318,7 @@
                 title: title, 
                 priority: priorityInput.value, 
                 repeat_type: repeatType,
+                due_date: dueDateInput.value,
                 progress: 0, 
                 created_at: new Date().toISOString(), 
                 subtasks: '[]',
@@ -331,6 +327,7 @@
             tasks.unshift(newTask);
             taskInput.value = '';
             customIntervalInput.value = '';
+            dueDateInput.value = '';
             saveLocal(); renderTasks();
 
             if (navigator.onLine && authToken) {
@@ -340,7 +337,7 @@
                         body: JSON.stringify(newTask) 
                     });
                     if (response.ok) { const data = await response.json(); newTask.id = data.id; saveLocal(); }
-                } catch (e) { console.log("Сохранено локально"); }
+                } catch (e) { console.log("Локально"); }
             }
         }
 
@@ -360,7 +357,7 @@
                     method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` }, 
                     body: JSON.stringify({ 
                         id: task.id, progress: task.progress, priority: task.priority, 
-                        subtasks: task.subtasks, repeat_type: task.repeat_type 
+                        subtasks: task.subtasks, repeat_type: task.repeat_type, due_date: task.due_date 
                     }) 
                 });
             } catch (e) { console.log("Офлайн"); }
