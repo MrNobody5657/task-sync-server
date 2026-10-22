@@ -27,7 +27,8 @@ def init_db():
             created_at TEXT,
             subtasks TEXT DEFAULT '[]',
             repeat_type TEXT DEFAULT 'none',
-            due_date TEXT DEFAULT '', 
+            due_date TEXT DEFAULT '',
+            attachment_url TEXT DEFAULT '', 
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
     """)
@@ -59,6 +60,7 @@ class TaskCreate(BaseModel):
     subtasks: str = '[]'
     repeat_type: str = 'none'
     due_date: str = ''
+    attachment_url: str = ''
 
 class TaskUpdate(BaseModel):
     id: int
@@ -67,6 +69,7 @@ class TaskUpdate(BaseModel):
     subtasks: str = '[]'
     repeat_type: str = 'none'
     due_date: str = ''
+    attachment_url: str = ''
 
 @app.post("/api/register")
 def register(user: UserCreate):
@@ -107,8 +110,8 @@ def create_task(task: TaskCreate, user_id: int = Depends(get_current_user)):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute(
-        "INSERT INTO tasks (user_id, title, priority, progress, created_at, subtasks, repeat_type, due_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (user_id, task.title, task.priority, task.progress, task.created_at, task.subtasks, task.repeat_type, task.due_date)
+        "INSERT INTO tasks (user_id, title, priority, progress, created_at, subtasks, repeat_type, due_date, attachment_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (user_id, task.title, task.priority, task.progress, task.created_at, task.subtasks, task.repeat_type, task.due_date, task.attachment_url)
     )
     conn.commit(); task_id = c.lastrowid; conn.close()
     return {"id": task_id, "status": "ok"}
@@ -118,8 +121,8 @@ def update_task(task_id: int, task: TaskUpdate, user_id: int = Depends(get_curre
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute(
-        "UPDATE tasks SET progress = ?, priority = ?, subtasks = ?, repeat_type = ?, due_date = ? WHERE id = ? AND user_id = ?",
-        (task.progress, task.priority, task.subtasks, task.repeat_type, task.due_date, task_id, user_id)
+        "UPDATE tasks SET progress = ?, priority = ?, subtasks = ?, repeat_type = ?, due_date = ?, attachment_url = ? WHERE id = ? AND user_id = ?",
+        (task.progress, task.priority, task.subtasks, task.repeat_type, task.due_date, task.attachment_url, task_id, user_id)
     )
     conn.commit(); conn.close()
     return {"status": "ok"}
