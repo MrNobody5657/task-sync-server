@@ -32,6 +32,16 @@ def init_db():
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
     """)
+    # НОВАЯ ТАБЛИЦА ДЛЯ СОВМЕСТНОГО ДОСТУПА
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS task_shares (
+            task_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            PRIMARY KEY (task_id, user_id),
+            FOREIGN KEY(task_id) REFERENCES tasks(id),
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -71,6 +81,10 @@ class TaskUpdate(BaseModel):
     due_date: str = ''
     attachment_url: str = ''
 
+class ShareRequest(BaseModel):
+    task_id: int
+    email: str
+
 @app.post("/api/register")
 def register(user: UserCreate):
     conn = sqlite3.connect(DB_PATH)
@@ -96,14 +110,31 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     conn.commit(); conn.close()
     return {"access_token": token, "token_type": "bearer"}
 
+# Получение задач (свои + те, которыми поделились)
 @app.get("/api/tasks", response_model=List[dict])
 def get_tasks(user_id: int = Depends(get_current_user)):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT * FROM tasks WHERE user_id = ? ORDER BY id DESC", (user_id,))
-    rows = c.fetchall(); conn.close()
-    return [dict(row) for row in rows]
+    
+    # Берем задачи, где user_id = наш, ИЛИ которые есть в task_shares
+    c.execute("""
+        SELECT t.* FROM tasks t
+        LEFT JOIN task_shares s ON t.id = s.task_id
+        WHERE t.user_id = ? OR s.user_id = ?
+        ORDER BY t.id DESC
+    """, (user_id, user_id))
+    rows = c.fetchall()
+    
+    result = []
+    for row in rows:
+        task = dict(row)
+        # Добавляем флаг, является ли пользователь владельцем
+        task['is_owner'] = (task['user_id'] == user_id)
+        result.append(task)
+        
+    conn.close()
+    return result
 
 @app.post("/api/tasks")
 def create_task(task: TaskCreate, user_id: int = Depends(get_current_user)):
@@ -120,9 +151,19 @@ def create_task(task: TaskCreate, user_id: int = Depends(get_current_user)):
 def update_task(task_id: int, task: TaskUpdate, user_id: int = Depends(get_current_user)):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    # Проверяем, есть ли доступ (владелец или тот, с кем поделились)
+    c.execute("""
+        SELECT t.id FROM tasks t
+        LEFT JOIN task_shares s ON t.id = s.task_id
+        WHERE t.id = ? AND (t.user_id = ? OR s.user_id = ?)
+    """, (task_id, user_id, user_id))
+    if not c.fetchone():
+        conn.close()
+        raise HTTPException(status_code=403, detail="Нет доступа к задаче")
+    
     c.execute(
-        "UPDATE tasks SET progress = ?, priority = ?, subtasks = ?, repeat_type = ?, due_date = ?, attachment_url = ? WHERE id = ? AND user_id = ?",
-        (task.progress, task.priority, task.subtasks, task.repeat_type, task.due_date, task.attachment_url, task_id, user_id)
+        "UPDATE tasks SET progress = ?, priority = ?, subtasks = ?, repeat_type = ?, due_date = ?, attachment_url = ? WHERE id = ?",
+        (task.progress, task.priority, task.subtasks, task.repeat_type, task.due_date, task.attachment_url, task_id)
     )
     conn.commit(); conn.close()
     return {"status": "ok"}
@@ -131,6 +172,37 @@ def update_task(task_id: int, task: TaskUpdate, user_id: int = Depends(get_curre
 def delete_task(task_id: int, user_id: int = Depends(get_current_user)):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    # Удалять может только владелец
     c.execute("DELETE FROM tasks WHERE id = ? AND user_id = ?", (task_id, user_id))
     conn.commit(); conn.close()
     return {"status": "ok"}
+
+# Эндпоинт для совместного доступа
+@app.post("/api/share")
+def share_task(req: ShareRequest, user_id: int = Depends(get_current_user)):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    # Проверяем, что задача принадлежит тому, кто делится
+    c.execute("SELECT id FROM tasks WHERE id = ? AND user_id = ?", (req.task_id, user_id))
+    if not c.fetchone():
+        conn.close()
+        raise HTTPException(status_code=403, detail="Вы не владелец задачи")
+    
+    # Ищем пользователя по email
+    c.execute("SELECT id FROM users WHERE email = ?", (req.email,))
+    target_user = c.fetchone()
+    if not target_user:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Пользователь с таким email не найден")
+    
+    # Добавляем связь
+    try:
+        c.execute("INSERT INTO task_shares (task_id, user_id) VALUES (?, ?)", (req.task_id, target_user[0]))
+        conn.commit()
+        return {"status": "ok", "message": "Задача успешно отправлена!"}
+    except sqlite3.IntegrityError:
+        conn.close()
+        return {"status": "ok", "message": "У этого пользователя уже есть доступ"}
+    finally:
+        conn.close()
