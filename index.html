@@ -24,6 +24,11 @@
         .offline-banner { background: #cf6679; color: #000; text-align: center; padding: 8px; font-size: 14px; font-weight: bold; border-radius: 8px; margin-bottom: 15px; display: none; }
         .offline-banner.active { display: block; }
 
+        /* Стили для поиска */
+        .search-bar { margin-bottom: 15px; }
+        #searchInput { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #333; background-color: var(--card); color: var(--text); font-size: 16px; }
+        #searchInput:focus { outline: none; border-color: var(--accent); }
+
         .input-group { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
         input[type="text"] { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #333; background-color: var(--card); color: var(--text); font-size: 16px; min-width: 150px; }
         select { padding: 12px; border-radius: 8px; border: 1px solid #333; background-color: var(--card); color: var(--text); font-size: 14px; cursor: pointer; }
@@ -88,6 +93,10 @@
         <div id="offlineBanner" class="offline-banner">⚡ Офлайн-режим</div>
         <h1>📱 Мои Задачи</h1>
         
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="🔍 Поиск по задачам..." oninput="renderTasks()">
+        </div>
+
         <div class="input-group">
             <input type="text" id="taskInput" placeholder="Что нужно сделать?">
             <select id="priorityInput">
@@ -128,6 +137,7 @@
         const taskList = document.getElementById('taskList');
         const offlineBanner = document.getElementById('offlineBanner');
         const authError = document.getElementById('authError');
+        const searchInput = document.getElementById('searchInput');
 
         function toggleCustomInterval() {
             if (repeatInput.value === 'custom') customIntervalInput.classList.add('visible');
@@ -241,9 +251,18 @@
 
         function renderTasks() {
             taskList.innerHTML = '';
+            
+            // Получаем текст из поиска (в нижнем регистре для удобства)
+            const searchText = searchInput.value.toLowerCase();
+
             let filteredTasks = tasks.filter(task => {
-                if (currentFilter === 'active') return task.progress < 100;
-                if (currentFilter === 'done') return task.progress === 100;
+                // 1. Фильтр по вкладкам (Все / Активные / Архив)
+                if (currentFilter === 'active' && task.progress >= 100) return false;
+                if (currentFilter === 'done' && task.progress < 100) return false;
+                
+                // 2. Фильтр по поиску
+                if (searchText && !task.title.toLowerCase().includes(searchText)) return false;
+                
                 return true;
             });
 
