@@ -69,12 +69,9 @@
 
         .empty-msg { text-align: center; color: #666; margin-top: 40px; font-style: italic; }
         .logout-btn { position: absolute; top: 20px; right: 20px; background: none; border: none; color: #cf6679; cursor: pointer; font-size: 14px; }
-        
-        /* Индикатор загрузки */
         .loading { text-align: center; color: #888; margin-top: 20px; font-style: italic; }
     </style>
 </head><body>
-    <!-- ЭКРАН ВХОДА -->
     <div id="authScreen" class="screen active">
         <div class="auth-container">
             <h1>📱 Мои Задачи</h1>
@@ -86,7 +83,6 @@
         </div>
     </div>
 
-    <!-- ГЛАВНЫЙ ЭКРАН -->
     <div id="mainScreen" class="screen">
         <button class="logout-btn" id="logoutBtn">Выйти</button>
         <div id="offlineBanner" class="offline-banner">⚡ Офлайн-режим</div>
@@ -138,7 +134,6 @@
             else customIntervalInput.classList.remove('visible');
         }
 
-        // 1. Проверка авторизации при запуске
         function checkAuth() {
             if (authToken && authToken !== 'undefined') {
                 authScreen.classList.remove('active');
@@ -150,7 +145,6 @@
             }
         }
 
-        // 2. Логин
         document.getElementById('loginBtn').addEventListener('click', async () => {
             const email = document.getElementById('authEmail').value;
             const password = document.getElementById('authPassword').value;
@@ -165,7 +159,7 @@
                 if (res.ok) {
                     const data = await res.json();
                     authToken = data.access_token;
-                    localStorage.setItem('auth_token', authToken); // Сохраняем
+                    localStorage.setItem('auth_token', authToken);
                     checkAuth();
                 } else {
                     authError.innerText = 'Неверный email или пароль';
@@ -175,7 +169,6 @@
             }
         });
 
-        // 3. Регистрация
         document.getElementById('registerBtn').addEventListener('click', async () => {
             const email = document.getElementById('authEmail').value;
             const password = document.getElementById('authPassword').value;
@@ -197,14 +190,12 @@
             }
         });
 
-        // 4. Выход
         document.getElementById('logoutBtn').addEventListener('click', () => {
             authToken = null;
             localStorage.removeItem('auth_token');
             checkAuth();
         });
 
-        // --- РАБОТА С ДАННЫМИ ---
         function saveLocal() { localStorage.setItem('my_tasks_offline', JSON.stringify(tasks)); }
         function loadLocal() { const local = localStorage.getItem('my_tasks_offline'); return local ? JSON.parse(local) : []; }
 
@@ -214,7 +205,6 @@
 
             if (!authToken || !navigator.onLine) return;
 
-            // Показываем, что идет загрузка
             if (taskList.innerHTML === '' || taskList.innerHTML.includes('Пусто')) {
                 taskList.innerHTML = '<div class="loading">Загрузка с сервера...</div>';
             }
@@ -225,14 +215,12 @@
                     tasks = await response.json();
                     saveLocal(); renderTasks();
                 } else if (response.status === 401) {
-                    // Токен протух (только в этом случае разлогиниваем)
                     localStorage.removeItem('auth_token'); 
                     authToken = null;
                     checkAuth();
                 }
             } catch (e) { 
                 console.log("Нет связи с сервером, работаем офлайн.");
-                // Не удаляем токен при ошибке сети!
             }
         }
 
@@ -289,7 +277,12 @@
                     </div>
                     <div class="progress-controls">
                         <input type="range" min="0" max="100" value="${task.progress}" oninput="updateProgress(${index}, this.value)" onchange="saveToServer(${index})">
-                        <span class="percent-sign">${task.progress}%</span>
+                        
+                        <input type="number" min="0" max="100" value="${task.progress}" 
+                               onchange="updateProgress(${index}, this.value); saveToServer(${index})" 
+                               style="width: 60px; background: var(--bg); color: var(--text); border: 1px solid #444; border-radius: 4px; padding: 4px; text-align: center;">
+                        
+                        <span class="percent-sign">%</span>
                     </div>
                 `;
                 taskList.appendChild(div);
@@ -334,6 +327,8 @@
 
         function updateProgress(index, value) {
             let val = parseInt(value);
+            if (isNaN(val)) val = 0;
+            if (val < 0) val = 0; if (val > 100) val = 100;
             tasks[index].progress = val;
             saveLocal(); renderTasks(); 
         }
@@ -377,7 +372,6 @@
         addBtn.addEventListener('click', addTask);
         taskInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') addTask(); });
         
-        // Запуск
         checkAuth();
     </script>
 </body>
