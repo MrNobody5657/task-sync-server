@@ -34,7 +34,6 @@
         #customIntervalInput { display: none; width: 80px; padding: 12px; border-radius: 8px; border: 1px solid #333; background-color: var(--card); color: var(--text); font-size: 16px; }
         #customIntervalInput.visible { display: block; }
 
-        /* Поле даты */
         #dueDateInput { padding: 12px; border-radius: 8px; border: 1px solid #333; background-color: var(--card); color: var(--text); font-size: 14px; width: 100%; }
         #dueDateInput:focus { outline: none; border-color: var(--accent); }
 
@@ -44,6 +43,19 @@
         .filter-btn { padding: 8px 16px; border-radius: 20px; border: 1px solid #444; background: transparent; color: var(--text); font-size: 14px; cursor: pointer; white-space: nowrap; }
         .filter-btn.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: bold; }
         
+        /* Панель статистики */
+        .stats-bar {
+            display: flex;
+            justify-content: space-around;
+            background: var(--card);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            border: 1px solid #333;
+        }
+        .stat-item { display: flex; gap: 5px; align-items: center; }
+
         .task-list { display: flex; flex-direction: column; gap: 10px; }
         .task-item { background-color: var(--card); padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 12px; border-left: 4px solid #333; transition: all 0.3s ease; position: relative; }
         .task-item.p-high { border-left-color: var(--priority-high); }
@@ -123,6 +135,13 @@
             <button class="filter-btn active" onclick="setFilter('all')">Все</button>
             <button class="filter-btn" onclick="setFilter('active')">Активные</button>
             <button class="filter-btn" onclick="setFilter('done')">📦 Архив</button>
+        </div>
+
+        <!-- Панель статистики -->
+        <div class="stats-bar">
+            <div class="stat-item">🟢 Выполнено: <span id="statDone">0</span></div>
+            <div class="stat-item">🔴 Просрочено: <span id="statOverdue">0</span></div>
+            <div class="stat-item">🔵 Активных: <span id="statActive">0</span></div>
         </div>
 
         <div class="task-list" id="taskList"></div>
@@ -238,7 +257,6 @@
         function getDueBadge(task) {
             if (!task.due_date) return '';
             const today = new Date().toISOString().split('T')[0];
-            
             if (task.due_date < today && task.progress < 100) {
                 return '<span class="repeat-badge" style="background:#ff5252; color:#fff;">Просрочено</span>';
             } else if (task.due_date === today && task.progress < 100) {
@@ -248,8 +266,29 @@
             }
         }
 
+        // Функция подсчета статистики
+        function updateStats() {
+            const today = new Date().toISOString().split('T')[0];
+            let done = 0, overdue = 0, active = 0;
+
+            tasks.forEach(task => {
+                if (task.progress === 100) {
+                    done++;
+                } else {
+                    if (task.due_date && task.due_date < today) overdue++;
+                    active++;
+                }
+            });
+
+            document.getElementById('statDone').innerText = done;
+            document.getElementById('statOverdue').innerText = overdue;
+            document.getElementById('statActive').innerText = active;
+        }
+
         function renderTasks() {
             taskList.innerHTML = '';
+            updateStats(); // Обновляем статистику при каждой отрисовке
+
             const searchText = searchInput.value.toLowerCase();
 
             let filteredTasks = tasks.filter(task => {
@@ -272,8 +311,6 @@
                 
                 const repeatText = getRepeatText(task.repeat_type);
                 let repeatHtml = repeatText ? `<span class="repeat-badge">${repeatText}</span>` : '';
-                
-                // Бейдж дедлайна
                 const dueHtml = getDueBadge(task);
 
                 div.innerHTML = `
