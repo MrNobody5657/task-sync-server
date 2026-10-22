@@ -28,7 +28,7 @@ def init_db():
             subtasks TEXT DEFAULT '[]',
             repeat_type TEXT DEFAULT 'none',
             due_date TEXT DEFAULT '',
-            attachment_url TEXT DEFAULT '', 
+            attachment_url TEXT DEFAULT '',
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
     """)
