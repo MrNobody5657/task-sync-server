@@ -37,7 +37,6 @@
         #dueDateInput { padding: 12px; border-radius: 8px; border: 1px solid #333; background-color: var(--card); color: var(--text); font-size: 14px; width: 100%; }
         #dueDateInput:focus { outline: none; border-color: var(--accent); }
 
-        /* Поле для ссылки на файл */
         #attachmentInput { padding: 12px; border-radius: 8px; border: 1px solid #333; background-color: var(--card); color: var(--text); font-size: 14px; width: 100%; }
         #attachmentInput:focus { outline: none; border-color: var(--accent); }
 
@@ -80,6 +79,7 @@
         .attach-icon { text-decoration: none; font-size: 16px; }
         
         .task-actions { display: flex; gap: 5px; align-items: center; }
+        .share-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 5px; }
         .check-btn { background: none; border: 2px solid #444; border-radius: 50%; width: 28px; height: 28px; display: flex; justify-content: center; align-items: center; cursor: pointer; font-size: 16px; color: transparent; transition: all 0.2s; }
         .check-btn.done { background-color: var(--success); border-color: var(--success); color: #000; }
         .delete-btn { background: none; border: none; font-size: 20px; cursor: pointer; padding: 5px; border-radius: 5px; }
@@ -354,6 +354,7 @@
                             </div>
                         </div>
                         <div class="task-actions">
+                            <button class="share-btn" onclick="shareTask(${index})" title="Поделиться">👥</button>
                             <button class="check-btn ${isDone ? 'done' : ''}" onclick="toggleComplete(${index})">✓</button>
                             <button class="delete-btn" onclick="deleteTask(${index})">🗑️</button>
                         </div>
@@ -422,6 +423,37 @@
                 startX = 0;
                 currentX = 0;
             });
+        }
+
+        async function shareTask(index) {
+            const task = tasks[index];
+            if (!task.is_owner) {
+                alert('Вы можете делиться только своими задачами!');
+                return;
+            }
+            
+            const email = prompt('Введите email пользователя, с которым хотите поделиться задачей:');
+            if (!email) return;
+
+            if (!navigator.onLine || !authToken) {
+                alert('Для отправки приглашения нужен интернет.');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/api/share`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                    body: JSON.stringify({ task_id: task.id, email: email })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(data.message || 'Успешно!');
+                } else {
+                    alert(data.detail || 'Ошибка');
+                }
+            } catch (e) {
+                alert('Сервер недоступен');
+            }
         }
 
         async function addTask() {
